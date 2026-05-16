@@ -19,8 +19,8 @@ import type { Registrar } from "../typechain-types/contracts/Registrar";
 
 const ENCRYPTED_ERC_ADDRESS = "0x68eCE3bafEE50cEeae5Da816128b5633C7ed2fdB";
 const TOKEN_ID = 0n; // Standalone mode
-const MINT_AMOUNT = 10000n; // 100.00 tokens with decimals=2
-const TRANSFER_AMOUNT = 2500n; // 25.00 tokens with decimals=2
+const DEFAULT_MINT_AMOUNT = 10000n; // 100.00 tokens with decimals=2
+const DEFAULT_TRANSFER_AMOUNT = 2500n; // 25.00 tokens with decimals=2
 
 type BabyJubUser = {
   evmAddress: string;
@@ -210,7 +210,17 @@ async function main() {
   }
 
   const owner = signers[0];
-  const recipientSigner = signers[1];
+  const recipientAddressOverride = process.env.RECIPIENT_ADDRESS?.trim().toLowerCase();
+  const recipientSigner = recipientAddressOverride
+    ? signers.find((s) => s.address.toLowerCase() === recipientAddressOverride)
+    : signers[1];
+
+  if (!recipientSigner) {
+    throw new Error(`Recipient signer not found for RECIPIENT_ADDRESS=${process.env.RECIPIENT_ADDRESS}`);
+  }
+
+  const mintAmount = BigInt(process.env.MINT_AMOUNT_BASE_UNITS || DEFAULT_MINT_AMOUNT.toString());
+  const transferAmount = BigInt(process.env.TRANSFER_AMOUNT_BASE_UNITS || DEFAULT_TRANSFER_AMOUNT.toString());
 
   const sender = buildUserFromEnv(owner.address, "AVA_PK");
   const recipient = buildUserFromEnv(recipientSigner.address, "AVA_PK2");
@@ -225,8 +235,8 @@ async function main() {
     owner: owner.address,
     recipient: recipientSigner.address,
     tokenId: TOKEN_ID.toString(),
-    mintAmountBaseUnits: MINT_AMOUNT.toString(),
-    transferAmountBaseUnits: TRANSFER_AMOUNT.toString(),
+    mintAmountBaseUnits: mintAmount.toString(),
+    transferAmountBaseUnits: transferAmount.toString(),
   });
 
   const senderKeyOnChain = await registrar.getUserPublicKey(owner.address);
@@ -250,7 +260,7 @@ async function main() {
   const auditorKeyStruct = await encryptedERC.auditorPublicKey();
   const auditorPublicKey = [BigInt(auditorKeyStruct.x.toString()), BigInt(auditorKeyStruct.y.toString())];
 
-  const mintCalldata = await generateMintCalldata(MINT_AMOUNT, sender.publicKey, auditorPublicKey);
+  const mintCalldata = await generateMintCalldata(mintAmount, sender.publicKey, auditorPublicKey);
   const privateMintTx = await encryptedERC
     .connect(owner)
     ["privateMint(address,((uint256[2],uint256[2][2],uint256[2]),uint256[24]))"](owner.address, {
@@ -274,7 +284,7 @@ async function main() {
     sender,
     senderBalanceBefore,
     recipient.publicKey,
-    TRANSFER_AMOUNT,
+    transferAmount,
     senderEncryptedBalance,
     auditorPublicKey,
   );
@@ -300,10 +310,11 @@ async function main() {
     senderBefore: senderBalanceBefore.toString(),
     senderAfter: senderAfter.toString(),
     recipientAfter: recipientAfter.toString(),
-    expectedSenderAfter: (senderBalanceBefore - TRANSFER_AMOUNT).toString(),
-    expectedRecipientIncrease: TRANSFER_AMOUNT.toString(),
+    expectedSenderAfter: (senderBalanceBefore - transferAmount).toString(),
+    expectedRecipientIncrease: transferAmount.toString(),
     snowtraceTx: `https://testnet.snowtrace.io/tx/${privateTransferTx.hash}`,
   });
+  console.log(`PRIVATE_TRANSFER_TX_HASH=${privateTransferTx.hash}`);
 }
 
 main().catch((error) => {

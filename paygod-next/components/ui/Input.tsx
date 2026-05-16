@@ -36,7 +36,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
         <input
           ref={ref}
-          readOnly={readOnly || locked}
+          readOnly={readOnly}
           className="flex-1 bg-transparent px-3 h-full text-sm text-white placeholder:text-[var(--text-secondary)] outline-none rounded-none"
           {...props}
         />

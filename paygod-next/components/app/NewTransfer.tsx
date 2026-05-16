@@ -11,9 +11,14 @@ import {
   ShieldAlert,
   ArrowRight,
 } from "lucide-react";
+import { isAddress } from "viem";
+import { usePublicClient, useReadContract } from "wagmi";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import encryptedErcArtifact from "@/lib/abi/EncryptedERC.json";
+import registrarArtifact from "@/lib/abi/Registrar.json";
+import { useWeb3App } from "@/contexts/web3-app-context";
 
 type StepIdx = 0 | 1 | 2 | 3;
 
@@ -97,17 +102,26 @@ const StepIndicator: React.FC<{ current: StepIdx }> = ({ current }) => (
 const StepRecipient: React.FC<{
   value: string;
   onChange: (v: string) => void;
-  onNext: () => void;
+  onNext: () => Promise<void>;
 }> = ({ value, onChange, onNext }) => {
   const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     if (!value.trim()) {
       setError("Wallet address is required.");
       return;
     }
     setError(null);
-    onNext();
+    setLoading(true);
+    try {
+      await onNext();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Recipient validation failed.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -135,8 +149,8 @@ const StepRecipient: React.FC<{
           Address will be verified against compliance registry before transfer.
         </span>
       </div>
-      <Button variant="primary" className="w-full mt-6" onClick={submit}>
-        Continue
+      <Button variant="primary" className="w-full mt-6" onClick={submit} disabled={loading}>
+        {loading ? "Validating recipient..." : "Continue"}
       </Button>
     </div>
   );
@@ -160,9 +174,9 @@ const StepAmount: React.FC<{
       <Input
         locked
         placeholder="0.00"
+        inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        readOnly={false}
       />
       <span
         className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -374,10 +388,59 @@ const SummaryRow: React.FC<{ label: string; children: React.ReactNode }> = ({ la
 
 const StepConfirm: React.FC<{
   recipient: string;
+  amount: string;
   onBack: () => void;
-}> = ({ recipient, onBack }) => {
+}> = ({ recipient, amount, onBack }) => {
   const router = useRouter();
+  const { isConnected } = useWeb3App();
   const [submitted, setSubmitted] = React.useState(false);
+  const [txHash, setTxHash] = React.useState<`0x${string}` | null>(null);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [isSubmittingTx, setIsSubmittingTx] = React.useState(false);
+
+  const isConfirmingTx = false;
+  const isConfirmedTx = submitted;
+
+  const executeTransfer = async () => {
+    if (!isConnected) {
+      setSubmitError("Connect your wallet to execute the transfer.");
+      return;
+    }
+    if (!isAddress(recipient)) {
+      setSubmitError("Recipient address is invalid.");
+      return;
+    }
+
+    try {
+      setIsSubmittingTx(true);
+      setSubmitError(null);
+      const response = await fetch("/api/transfers/private", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient, amount }),
+      });
+
+      const payload = (await response.json()) as {
+        ok: boolean;
+        txHash?: `0x${string}`;
+        error?: string;
+        details?: string;
+      };
+
+      if (!response.ok || !payload.ok || !payload.txHash) {
+        const details = payload.error || payload.details || "Transfer execution failed.";
+        throw new Error(details);
+      }
+
+      setTxHash(payload.txHash);
+      setSubmitted(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Transaction rejected.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmittingTx(false);
+    }
+  };
 
   if (submitted) {
     return (
@@ -400,19 +463,27 @@ const StepConfirm: React.FC<{
           Transfer Submitted
         </h3>
         <p className="mt-2 mx-auto" style={{ color: "var(--text-secondary)", fontSize: 13, maxWidth: 360 }}>
-          Your confidential transfer has been submitted to the Avalanche Subnet.
+          Your confidential transfer request has been submitted to the Avalanche Subnet.
         </p>
-        <div
-          className="mt-4 inline-block px-3 py-1.5 font-mono"
-          style={{
-            border: "1px solid var(--border)",
-            backgroundColor: "var(--surface)",
-            color: "var(--text-secondary)",
-            fontSize: 12,
-          }}
-        >
-          0x2d4f...6b8a
-        </div>
+        {txHash ? (
+          <a
+            href={`https://testnet.snowtrace.io/tx/${txHash}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 inline-block px-3 py-1.5 font-mono"
+            style={{
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--surface)",
+              color: "var(--text-secondary)",
+              fontSize: 12,
+            }}
+          >
+            {txHash}
+          </a>
+        ) : null}
+        <p className="mt-3" style={{ color: "var(--text-secondary)", fontSize: 12 }}>
+          {isConfirmingTx ? "Waiting for confirmation..." : isConfirmedTx ? "Transaction submitted with circuit proof." : "Transaction submitted."}
+        </p>
         <Button
           variant="outline"
           className="w-full mt-6"
@@ -446,7 +517,7 @@ const StepConfirm: React.FC<{
           </span>
         </SummaryRow>
         <SummaryRow label="Amount">
-          <span className="text-white" style={{ fontWeight: 500 }}>••••• DoC</span>
+          <span className="text-white" style={{ fontWeight: 500 }}>{amount || "0"} DoC</span>
         </SummaryRow>
         <SummaryRow label="Network">
           <span
@@ -481,11 +552,17 @@ const StepConfirm: React.FC<{
         size="lg"
         className="w-full mt-6"
         style={{ height: 48 }}
-        onClick={() => setSubmitted(true)}
+        onClick={executeTransfer}
+        disabled={isSubmittingTx || isConfirmingTx}
       >
-        Execute Transfer
+        {isSubmittingTx ? "Generating proof and sending tx..." : isConfirmingTx ? "Confirming transaction..." : "Execute Transfer"}
         <ArrowRight size={16} strokeWidth={2} />
       </Button>
+      {submitError ? (
+        <p className="text-center mt-3" style={{ color: "var(--accent)", fontSize: 12 }}>
+          {submitError}
+        </p>
+      ) : null}
       <p
         className="text-center mt-3"
         style={{ color: "var(--text-secondary)", fontSize: 11 }}
@@ -506,6 +583,38 @@ export const NewTransfer: React.FC = () => {
   const [recipient, setRecipient] = React.useState("");
   const [amount, setAmount] = React.useState("");
   const [compliance, setCompliance] = React.useState<ComplianceState>("idle");
+  const { encryptedErcAddress } = useWeb3App();
+  const publicClient = usePublicClient();
+
+  const { data: registrarAddress } = useReadContract({
+    address: encryptedErcAddress,
+    abi: encryptedErcArtifact.abi,
+    functionName: "registrar",
+    query: { enabled: Boolean(encryptedErcAddress) },
+  });
+
+  const validateRecipient = React.useCallback(async () => {
+    const trimmed = recipient.trim();
+    if (!isAddress(trimmed)) {
+      throw new Error("Recipient must be a valid EVM address.");
+    }
+    if (!registrarAddress || !publicClient) {
+      throw new Error("Registrar is not available yet.");
+    }
+
+    const isRegistered = await publicClient.readContract({
+      address: registrarAddress as `0x${string}`,
+      abi: registrarArtifact.abi,
+      functionName: "isUserRegistered",
+      args: [trimmed as `0x${string}`],
+    });
+
+    if (!isRegistered) {
+      throw new Error("Recipient is not registered in Registrar.");
+    }
+
+    setStep(1);
+  }, [publicClient, recipient, registrarAddress]);
 
   return (
     <div>
@@ -515,7 +624,7 @@ export const NewTransfer: React.FC = () => {
           <StepRecipient
             value={recipient}
             onChange={setRecipient}
-            onNext={() => setStep(1)}
+            onNext={validateRecipient}
           />
         )}
         {step === 1 && (
@@ -538,9 +647,14 @@ export const NewTransfer: React.FC = () => {
           />
         )}
         {step === 3 && (
-          <StepConfirm recipient={recipient} onBack={() => setStep(2)} />
+          <StepConfirm recipient={recipient} amount={amount} onBack={() => setStep(2)} />
         )}
       </Card>
     </div>
   );
 };
+
+
+
+
+
