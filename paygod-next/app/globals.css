@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "./styles/animations.css";
+@import "tailwindcss";
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --background: #000000;
+  --surface: #0F0F0F;
+  --surface-2: #161616;
+  --border: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.15);
+  --text-primary: #FFFFFF;
+  --text-secondary: #888888;
+  --accent: #ED3134;
+  --accent-hover: #C42528;
+  --accent-subtle: rgba(237,49,52,0.08);
+  --success: #4ADE80;
+  --warning: #FBBF24;
+  --danger: #ED3134;
+}
+
+html, body {
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+html { scroll-behavior: smooth; }
+
+a { color: inherit; text-decoration: none; }
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 96px 32px 32px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 16px;
+}

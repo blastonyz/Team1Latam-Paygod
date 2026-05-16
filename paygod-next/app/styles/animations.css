@@ -1,0 +1,87 @@
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  opacity: 0;
+  animation: fadeUp 0.6s ease-out forwards;
+}
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.marquee {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+}
+.marquee-track {
+  display: flex;
+  align-items: center;
+  gap: 64px;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.grid-shader-grid {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+}
+.grid-shader-glow {
+  filter: blur(60px);
+  mix-blend-mode: screen;
+  opacity: 0.7;
+}
+.grid-shader-glow-1 {
+  background: radial-gradient(circle at 20% 30%, rgba(237,49,52,0.55) 0%, transparent 30%);
+  animation: gridGlowA 14s ease-in-out infinite alternate;
+}
+.grid-shader-glow-2 {
+  background: radial-gradient(circle at 80% 60%, rgba(237,49,52,0.45) 0%, transparent 30%);
+  animation: gridGlowB 18s ease-in-out infinite alternate;
+}
+.grid-shader-glow-3 {
+  background: radial-gradient(circle at 50% 80%, rgba(196,37,40,0.4) 0%, transparent 28%);
+  animation: gridGlowC 22s ease-in-out infinite alternate;
+}
+@keyframes gridGlowA {
+  0% { transform: translate(-8%, -4%) scale(1); }
+  100% { transform: translate(12%, 8%) scale(1.15); }
+}
+@keyframes gridGlowB {
+  0% { transform: translate(6%, 4%) scale(1); }
+  100% { transform: translate(-10%, -6%) scale(1.2); }
+}
+@keyframes gridGlowC {
+  0% { transform: translate(0%, 6%) scale(1.05); }
+  100% { transform: translate(-6%, -10%) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .grid-shader-glow-1,
+  .grid-shader-glow-2,
+  .grid-shader-glow-3 {
+    animation: none !important;
+  }
+}
