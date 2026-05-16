@@ -1,0 +1,35 @@
+EncryptedERC Fuji Useful Data
+Updated: 2026-05-16
+
+Network
+- Name: Avalanche Fuji
+- Chain ID: 43113
+
+Contracts (deployed)
+- EncryptedERC: 0x68eCE3bafEE50cEeae5Da816128b5633C7ed2fdB
+- Registrar: 0xdc7a33eC510956b5eB42F58632906DAa6f53Cc81
+- BabyJubJub library: 0xea71C6aaEA05c63fead341857563CAc9cbfeFA25
+
+Verifiers
+- Registration: 0xe5268dc20DA2aE0B824a718004B7cB130c97B01A
+- Mint: 0x8e65577160d345150dC555fA009d05d7913c411D
+- Withdraw: 0x6D0eeb06217700d98092b4BA425236bc4555E0f9
+- Transfer: 0xFE666394c810Ab48aD51ABD7273547FA6D57ec3b
+- Burn: 0xC4cdfA62E25c5ef033a91A81CE5d8f191732A309
+
+Wallets
+- Deployer/Owner: 0x0571235134DC15a00f02916987C2c16b5fC52E2A
+- Recipient: 0x90813c2C61EE01857c2fDfD003f5272b540a7AA7
+
+Registration txs
+- Deployer register tx: 0x49e407970a1e847861f3eff0dc3da2f4712d91c26121bc0b86eb7bad4df43c7f
+- Recipient register tx: 0xe93e330576c9e307986b8e8ed488d6ef23c87d28d0f1d69bf5e76744dc0e7fe2
+
+Generic token (non-encrypted smoke)
+- GenericTransferBurnToken: 0xe12903D475C30e854af5a4A76EcD3c33a14880bb
+- Latest transfer tx: 0x30807a0a073effbe379e05c7cfcaaf29bbb51a201b39207d5dae39bd855ba1de
+
+Notes
+- EncryptedERC deployed in standalone mode.
+- Token decimals in this deployment: 2 (1 token = 100 base units).
+- For standalone EncryptedERC transfers, tokenId is 0.

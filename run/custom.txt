@@ -1,0 +1,77 @@
+Back
+Next
+Sobre Multisig + Dashboard
+Sí, el dashboard soporta multisig para el deploy del Validator Manager. Acá el flujo:
+
+Multisig Setup
+Step 1 of 4
+
+1
+Deploy POA Manager
+→
+
+2
+Read PoA Manager
+→
+
+3
+Transfer Ownership
+→
+
+4
+Read Validator Manager
+Deploy PoA Manager
+Deploy and initialize the PoAManager contract to manage Proof of Authority validators
+
+Edit on GitHub
+Report Issue
+Subnet ID
+2RmR4DDeawSg1zAtg33yimGak2tadGyLtAowbuxY9f7stoG1Ef
+Suggestions:
+2RmR4DDeawSg1zAtg33yimGak2tadGyLtAowbuxY9f7stoG1Ef
+The Subnet that you have just created in the "Create Chain" tool
+Echo (i9gFpZQHPLcGfZaQLiwFAStddQD7iTKBpFfurPFJsXm1CkTZK)
+Echo is a Testnet L1 for testing dApps utilizing ICM
+Dispatch (7WtoAMPhrmh5KosDUsFL9yTcvw7YSxiKHPpdfs4JsgW47oZT5)
+Dispatch is a Testnet L1 for testing dApps utilizing ICM
+Dexalot (9m6a3Qte8FaRbLZixLhh8Ptdkemm4csNaLwQeKkENx5wskbWP)
+Dexalot is a decentralized exchange (DEX) that operates on its own Avalanche L1, offering a central limit order book (CLOB) experience
+
+Validator Manager Details
+Contract Address
+
+0xfacade0000000000000000000000000000000000
+Contract Owner
+
+The contract function "owner" returned no data ("0x"). This could be due to any of the following: - The contract does not have the function "owner", - The parameters passed to the contract function may be invalid, or - The address is not a contract. Contract Call: address: 0xfacade0000000000000000000000000000000000 function: owner() Docs: https://viem.sh/docs/contract/readContract Version: viem@2.45.3
+Home Chain
+DAOpolis Chain
+
+2N5QU9hSJZd63eWcGR3RvsqxjS8msFUhRrxVTLuSQFZJZVwgA4
+Total Validator Weight
+
+Validator Manager contract weight is 0, is the contract initialized?
+Heads up: Make sure your Validator Manager is deployed on the same chain as your Ash Wallet deployment. You can get your L1 indexed to ensure full compatibility. You can proceed with other multisig options, but some console tools may lose compatibility if you do.
+Configure and Deploy PoA Manager
+Deploy the PoAManager contract with the specified owner and validator manager addresses. The contract will be initialized automatically during deployment.
+
+Current chain: C-Chain (ID: 43113)
+Ash Wallet Address
+Enter Ash Wallet address or select from your accounts
+Validator Manager Address
+0xfacade0000000000000000000000000000000000
+Deploy PoA Manager
+Verify Deployment
+Verify that the PoA Manager was deployed and initialized correctly.
+
+PoA Manager Address
+Verify Contract
+Back
+Next
+Lo que necesitás tener a mano:
+Dato	Dónde lo encontrás
+Subnet ID	Output del blockchain deploy
+Blockchain ID	2KoM3z52TSscC6YZ6kgYdGDZ1CsbHkB18DGGEhpozZJFPEyTEJ (ya lo tenés)
+RPC URL	Output del deploy
+Private Key / Wallet	El owner del contrato (MetaMask o Ledger)
+Multisig address	Si usás multisig, la dirección del Safe, para tener opcion, tendria q tener un contrato de validacion, podriamos verlo, ya te traigo markdown de ocntratos

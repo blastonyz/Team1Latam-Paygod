@@ -1,0 +1,39 @@
+Datos que hay que guardar:
+
+RPC: https://nodes-prod.18.182.4.86.sslip.io/ext/bc/PFS74JMCYphbhkuXSfTv8vsDzK6M2ugWwHkShdRiExjSEH2yo/rpc
+Explorer: https://pfs74jmc.firn.gg
+Chain ID: 526131
+Validator Manager en C-Chain: 0x30cfbda11801f049bac8f5948ba6a99713886b37
+MockUSDC en C-Chain: 0xfa4586d45469f64aeb77c05f8bc25f7b8cc9890f
+TokenRemote en tu L1: 0x1cc4a97809a34ec86dc8a18c72f61e332cbde1c4
+Qué significa esto:
+
+La infraestructura base ya está.
+PoA y bridging por ICM ya están validados en entorno real de Fuji.
+El problema de la CLI local deja de ser bloqueante.
+Lo único que esto no valida todavía es un precompile custom en Go.
+Orden correcto para seguir desarrollando la idea:
+
+Conectar wallet a la L1 con ese RPC y Chain ID.
+Verificar en explorer que el TokenRemote existe y que el bridge de MockUSDC quedó operativo.
+Desplegar contratos propios en la L1.
+Probar flujo institucional end-to-end.
+Yo haría los contratos en este orden:
+
+PrivateLiquidityToken
+KYBGateway
+RTGSSettlementEngine
+BridgeVault o LiquidityGateway del lado L1
+Adaptador para Fuji si quieres controlar mint/burn con reglas propias
+Recomendación práctica:
+
+No persigas más la CLI local por ahora.
+Toma esta L1 como base de producto.
+Construye el MVP con Solidity sobre esta red.
+Si después el hackathon exige “custom precompile”, lo retomas como extensión técnica, no como bloqueo del MVP.
+Siguiente paso útil:
+
+Te diseño la arquitectura exacta de esos 3 contratos base.
+Te los empiezo a escribir en el repo.
+Dejamos listo deploy sobre esta L1 de Fuji.
+S

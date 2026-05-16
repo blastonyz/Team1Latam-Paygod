@@ -1,0 +1,152 @@
+1. El Token ERC-20 Personalizado Institutional (Con Permisos y Permiso Off-chain)
+Para eliminar la fricción del approve (el cual jamás funciona en el constructor porque
+ en ese momento el contrato aún no tiene una dirección desplegada ni balances asignados
+  para autorizar a terceros), implementamos EIP-2612 (Permit) [1].Esto permite que los 
+  Cores Bancarios autoricen al Contrato Liquidador de forma firmada y off-chain. 
+  La autorización y la liquidación ocurren en una única transacción atómica, 
+  eliminando el cobro doble de gas.
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+contract InstitutionalLiquidityCoin is ERC20Permit, AccessControl {
+    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    mapping(address => bool) public isKYBVerified;
+    mapping(address => bool) public isFrozen;
+
+    event KYBStatusUpdated(address indexed institution, bool indexed status);
+    event FrozenStatusUpdated(address indexed institution, bool indexed status);
+
+    constructor(
+        string memory name, 
+        string memory symbol,
+        address bankaoolAdmin,
+        address arkangelesAdmin
+    ) ERC20(name, symbol) ERC20Permit(name) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(GOVERNANCE_ROLE, bankaoolAdmin);
+        _grantRole(GOVERNANCE_ROLE, arkangelesAdmin);
+    }
+
+    // Gancho de control transaccional estricto
+    function _update(address from, address to, uint256 value) internal override {
+        if (from != address(0) && to != address(0)) {
+            require(isKYBVerified[from], "ERROR_LBTR: Origen sin KYB");
+            require(isKYBVerified[to], "ERROR_LBTR: Destino sin KYB");
+            require(!isFrozen[from], "ERROR_LBTR: Origen congelado");
+            require(!isFrozen[to], "ERROR_LBTR: Destino congelado");
+        }
+        super._update(from, to, value);
+    }
+
+    function setKYB(address institution, bool status) external onlyRole(GOVERNANCE_ROLE) {
+        isKYBVerified[institution] = status;
+        emit KYBStatusUpdated(institution, status);
+    }
+
+    function setFreeze(address institution, bool status) external onlyRole(GOVERNANCE_ROLE) {
+        isFrozen[institution] = status;
+        emit FrozenStatusUpdated(institution, status);
+    }
+
+    function mintLiquidity(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
+        require(isKYBVerified[to], "ERROR_LBTR: Destino sin KYB para emision");
+        _mint(to, amount);
+    }
+
+    function forcedClawback(address from, address to, uint256 amount) external onlyRole(GOVERNANCE_ROLE) {
+        _transfer(from, to, amount);
+    }
+}
+
+2. El Contrato Liquidador Libre de Fricción (Atómico)Este contrato recibe la firma del mensaje ISO de liquidación y, al mismo tiempo, la firma de aprobación de fondos del ERC-20 (EIP-2612). Ejecuta la validación de mensajería, extrae los fondos permitidos y liquida el saldo a la contraparte en un solo bloque.
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+interface IInstitutionalToken {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
+}
+
+contract RTGSSettlementEngine {
+    IInstitutionalToken public immutable settlementToken;
+    address public immutable consorcioManager;
+
+    struct Pacs009Payload {
+        string msgId;
+        string dbtrBIC;
+        string cdtrBIC;
+        address dbtrAddr;
+        address cdtrAddr;
+        uint256 amount;
+        uint256 valueDate;
+        bytes32 isoXmlHash;
+    }
+
+    bytes32 public constant PACS009_TYPEHASH = keccak256(
+        "Pacs009Payload(string msgId,string dbtrBIC,string cdtrBIC,address dbtrAddr,address cdtrAddr,uint256 amount,uint256 valueDate,bytes32 isoXmlHash)"
+    );
+
+    bytes32 public immutable DOMAIN_SEPARATOR;
+    mapping(string => bool) public executedSettlements;
+
+    constructor(address _token, address _manager) {
+        settlementToken = IInstitutionalToken(_token);
+        consorcioManager = _manager;
+        
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256("RTGSSettlementEngine"),
+                keccak256("1"),
+                block.chainid,
+                address(this)
+            )
+        );
+    }
+
+    function settleInterbankAtomic(
+        Pacs009Payload calldata payload,
+        bytes calldata isoSignature,
+        uint256 permitDeadline,
+        uint8 pV, bytes32 pR, bytes32 pS
+    ) external {
+        require(!executedSettlements[payload.msgId], "ERROR_RTGS: Liquidacion ya procesada");
+        require(block.timestamp <= payload.valueDate, "ERROR_RTGS: Mensaje ISO caducado");
+
+        // 1. EJECUCIÓN DEL PERMIT (Aprobación sin Gas off-chain)
+        // El contrato liquidador usa la firma del banco deudor para otorgarse permiso de retiro a sí mismo
+        settlementToken.permit(payload.dbtrAddr, address(this), payload.amount, permitDeadline, pV, pR, pS);
+
+        // 2. VERIFICACIÓN DE LA MENSAJERÍA FINANCIERA (EIP-712)
+        bytes32 structHash = keccak256(
+            abi.encode(
+                PACS009_TYPEHASH,
+                keccak256(bytes(payload.msgId)),
+                keccak256(bytes(payload.dbtrBIC)),
+                keccak256(bytes(payload.cdtrBIC)),
+                payload.dbtrAddr,
+                payload.cdtrAddr,
+                payload.amount,
+                payload.valueDate,
+                payload.isoXmlHash
+            )
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+        
+        address signer = ecrecover(digest, uint8(isoSignature[0]), bytes32(isoSignature[1:33]), bytes32(isoSignature[33:65]));
+        require(signer == payload.dbtrAddr, "ERROR_RTGS: Firma de instruccion financiera invalida");
+
+        executedSettlements[payload.msgId] = true;
+
+        // 3. TRANSFERENCIA AUTOMÁTICA DE LIQUIDEZ REAL
+        bool success = settlementToken.transferFrom(payload.dbtrAddr, payload.cdtrAddr, payload.amount);
+        require(success, "ERROR_RTGS: Fallo en la ejecucion del clearing");
+    }
+}

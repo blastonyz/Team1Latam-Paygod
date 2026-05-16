@@ -1,0 +1,13 @@
+diff --git a/node_modules/@solarity/zktype/dist/core/ZkitTSGenerator.js b/node_modules/@solarity/zktype/dist/core/ZkitTSGenerator.js
+index a9c3fd2..4a2a85e 100644
+--- a/node_modules/@solarity/zktype/dist/core/ZkitTSGenerator.js
++++ b/node_modules/@solarity/zktype/dist/core/ZkitTSGenerator.js
+@@ -119,7 +119,7 @@ class ZkitTSGenerator extends BaseTSGenerator_1.default {
+             proofTypeName: this._getTypeName(circuitArtifact, this._getPrefix(protocolType), "Proof"),
+             calldataTypeName: this._getTypeName(circuitArtifact, this._getPrefix(protocolType), "Calldata"),
+             privateInputsTypeName: this._getTypeName(circuitArtifact, this._getPrefix(protocolType), "Private"),
+-            pathToUtils: path_1.default.relative(path_1.default.dirname(pathToGeneratedFile), pathToUtils),
++            pathToUtils: path_1.default.relative(path_1.default.dirname(pathToGeneratedFile), pathToUtils).replace(/\\/g, "/"),
+         };
+         return {
+             content: await prettier_1.default.format(ejs_1.default.render(template, templateParams), { parser: "typescript" }),
