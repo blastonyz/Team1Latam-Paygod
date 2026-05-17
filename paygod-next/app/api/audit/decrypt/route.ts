@@ -7,7 +7,8 @@ const ENCRYPTED_ERC_ADDRESS =
   process.env.ENCRYPTED_ERC_ADDRESS ||
   "0x68eCE3bafEE50cEeae5Da816128b5633C7ed2fdB";
 
-const zkBackendUrl = process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "";
+const sanitizeUrlEnv = (value: string) => value.trim().replace(/^['\"]+|['\"]+$/g, "");
+const zkBackendUrl = sanitizeUrlEnv(process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "");
 const forceLocalZk =
   String(process.env.FORCE_LOCAL_ZK || process.env.NEXT_PUBLIC_FORCE_LOCAL_ZK || "false").toLowerCase() === "true";
 

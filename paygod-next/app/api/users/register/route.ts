@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 const registerHashRegex = /REGISTER_WALLET_TX_HASH=(ALREADY_REGISTERED|0x[a-fA-F0-9]{64})/;
 const registeredAddressRegex = /REGISTERED_ADDRESS=(0x[a-fA-F0-9]{40})/;
 
-const zkBackendUrl = process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "";
+const sanitizeUrlEnv = (value: string) => value.trim().replace(/^['\"]+|['\"]+$/g, "");
+const zkBackendUrl = sanitizeUrlEnv(process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "");
 const forceLocalZk =
   String(process.env.FORCE_LOCAL_ZK || process.env.NEXT_PUBLIC_FORCE_LOCAL_ZK || "false").toLowerCase() === "true";
 
