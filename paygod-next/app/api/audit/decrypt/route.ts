@@ -7,6 +7,10 @@ const ENCRYPTED_ERC_ADDRESS =
   process.env.ENCRYPTED_ERC_ADDRESS ||
   "0x68eCE3bafEE50cEeae5Da816128b5633C7ed2fdB";
 
+const zkBackendUrl = process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "";
+const forceLocalZk =
+  String(process.env.FORCE_LOCAL_ZK || process.env.NEXT_PUBLIC_FORCE_LOCAL_ZK || "false").toLowerCase() === "true";
+
 const abi = [
   "event PrivateTransfer(address indexed from, address indexed to, uint256[7] auditorPCT, address indexed auditorAddress)",
   "event PrivateMint(address indexed user, uint256[7] auditorPCT, address indexed auditorAddress)",
@@ -40,6 +44,18 @@ const decryptPct = (pct: bigint[], privateKey: bigint) => {
 export async function POST(request: NextRequest) {
   const { txHash } = await request.json();
   if (!txHash) return NextResponse.json({ ok: false, error: "txHash is required" }, { status: 400 });
+
+  if (zkBackendUrl && !forceLocalZk) {
+    const response = await fetch(`${zkBackendUrl.replace(/\/$/, "")}/api/tx/decrypt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ txHash, encryptedErcAddress: ENCRYPTED_ERC_ADDRESS }),
+      cache: "no-store",
+    });
+
+    const payload = await response.json();
+    return NextResponse.json(payload, { status: response.status });
+  }
 
   const provider = new ethers.JsonRpcProvider(
     process.env.AVA_RPC_URL || process.env.NEXT_PUBLIC_AVA_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc",

@@ -275,7 +275,3 @@ Fix:
 
 ---
 
-If you want, this README can be split next into:
-- `README.demo.md` (2-minute presenter script + command checklist)
-- `README.ops.md` (deployment and incident recovery)
-- `README.dev.md` (developer onboarding)

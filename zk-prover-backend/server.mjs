@@ -5,6 +5,8 @@ import { spawn } from "node:child_process";
 const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
 const transferHashRegex = /PRIVATE_TRANSFER_TX_HASH=(0x[a-fA-F0-9]{64})/;
+const genericTxHashRegex = /(0x[a-fA-F0-9]{64})/;
+const addressRegex = /(0x[a-fA-F0-9]{40})/;
 
 const fixedMode = String(process.env.DEMO_FIXED_MODE || "true").toLowerCase() === "true";
 const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
@@ -63,18 +65,23 @@ function resolveConfig(body) {
   };
 }
 
-function runPrivateTransfer({ recipient, transferAmountBaseUnits, mintAmountBaseUnits, encryptedErcRoot }) {
+function getEncryptedErcRoot() {
+  return path.resolve(
+    process.cwd(),
+    process.env.ENCRYPTED_ERC_ROOT || "../EncryptedERC",
+  );
+}
+
+function runHardhatScript({ encryptedErcRoot, scriptFile, extraEnv = {} }) {
   return new Promise((resolve) => {
     const child = spawn(
       "npx",
-      ["hardhat", "run", "scripts/private-transfer-fuji.ts", "--network", "fuji"],
+      ["hardhat", "run", `scripts/${scriptFile}`, "--network", "fuji"],
       {
         cwd: encryptedErcRoot,
         env: {
           ...process.env,
-          RECIPIENT_ADDRESS: recipient,
-          TRANSFER_AMOUNT_BASE_UNITS: transferAmountBaseUnits,
-          MINT_AMOUNT_BASE_UNITS: mintAmountBaseUnits,
+          ...extraEnv,
         },
         shell: process.platform === "win32",
       },
@@ -95,6 +102,23 @@ function runPrivateTransfer({ recipient, transferAmountBaseUnits, mintAmountBase
       resolve({ stdout, stderr, code });
     });
   });
+}
+
+function runPrivateTransfer({ recipient, transferAmountBaseUnits, mintAmountBaseUnits, encryptedErcRoot }) {
+  return runHardhatScript({
+    encryptedErcRoot,
+    scriptFile: "private-transfer-fuji.ts",
+    extraEnv: {
+      RECIPIENT_ADDRESS: recipient,
+      TRANSFER_AMOUNT_BASE_UNITS: transferAmountBaseUnits,
+      MINT_AMOUNT_BASE_UNITS: mintAmountBaseUnits,
+    },
+  });
+}
+
+function firstTxHash(output) {
+  const match = String(output || "").match(genericTxHashRegex);
+  return match ? match[1] : null;
 }
 
 function parseBody(req) {
@@ -180,6 +204,166 @@ const server = http.createServer(async (req, res) => {
           verification: "onchain-in-encryptederc-transfer",
           txHash: match[1],
           snowtraceUrl: `https://testnet.snowtrace.io/tx/${match[1]}`,
+        },
+        origin,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unexpected error";
+      return jsonResponse(res, 500, { ok: false, error: message }, origin);
+    }
+  }
+
+  if (req.method === "POST" && req.url === "/api/users/register") {
+    try {
+      const body = await parseBody(req);
+      const encryptedErcRoot = getEncryptedErcRoot();
+      const walletPrivateKey = String(body?.privateKey || process.env.DEMO_REGISTER_PRIVATE_KEY || "").trim();
+      const targetAddress = normalizeAddress(body?.address || "");
+      const registrarAddress = normalizeAddress(body?.registrarAddress || process.env.REGISTRAR_ADDRESS || "");
+
+      if (!walletPrivateKey) {
+        return jsonResponse(
+          res,
+          400,
+          { ok: false, error: "privateKey is required for wallet registration" },
+          origin,
+        );
+      }
+
+      const result = await runHardhatScript({
+        encryptedErcRoot,
+        scriptFile: "register-wallet.ts",
+        extraEnv: {
+          RECIPIENT_PRIVATE_KEY: walletPrivateKey,
+          TARGET_ADDRESS: targetAddress,
+          REGISTRAR_ADDRESS: registrarAddress,
+        },
+      });
+
+      if (result.code !== 0) {
+        return jsonResponse(
+          res,
+          500,
+          {
+            ok: false,
+            error: "wallet registration failed",
+            details: result.stderr || result.stdout,
+          },
+          origin,
+        );
+      }
+
+      const txHash = firstTxHash(result.stdout);
+      const registeredAddress = targetAddress || (String(result.stdout).match(addressRegex)?.[1] ?? "");
+
+      return jsonResponse(
+        res,
+        200,
+        {
+          ok: true,
+          txHash,
+          registeredAddress,
+          snowtraceUrl: txHash ? `https://testnet.snowtrace.io/tx/${txHash}` : null,
+        },
+        origin,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unexpected error";
+      return jsonResponse(res, 500, { ok: false, error: message }, origin);
+    }
+  }
+
+  if (req.method === "POST" && req.url === "/api/auditor/set") {
+    try {
+      const body = await parseBody(req);
+      const encryptedErcRoot = getEncryptedErcRoot();
+      const auditorAddress = normalizeAddress(body?.auditorAddress || process.env.DEMO_AUDITOR_ADDRESS || "");
+      const encryptedErcAddress = normalizeAddress(body?.encryptedErcAddress || process.env.ENCRYPTED_ERC_ADDRESS || "");
+
+      if (!auditorAddress) {
+        return jsonResponse(res, 400, { ok: false, error: "auditorAddress is required" }, origin);
+      }
+
+      const result = await runHardhatScript({
+        encryptedErcRoot,
+        scriptFile: "set-auditor.ts",
+        extraEnv: {
+          AUDITOR_ADDRESS: auditorAddress,
+          ENCRYPTED_ERC_ADDRESS: encryptedErcAddress,
+        },
+      });
+
+      if (result.code !== 0) {
+        return jsonResponse(
+          res,
+          500,
+          {
+            ok: false,
+            error: "set auditor failed",
+            details: result.stderr || result.stdout,
+          },
+          origin,
+        );
+      }
+
+      const txHash = firstTxHash(result.stdout);
+      return jsonResponse(
+        res,
+        200,
+        {
+          ok: true,
+          auditorAddress,
+          txHash,
+          snowtraceUrl: txHash ? `https://testnet.snowtrace.io/tx/${txHash}` : null,
+        },
+        origin,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unexpected error";
+      return jsonResponse(res, 500, { ok: false, error: message }, origin);
+    }
+  }
+
+  if (req.method === "POST" && req.url === "/api/tx/decrypt") {
+    try {
+      const body = await parseBody(req);
+      const encryptedErcRoot = getEncryptedErcRoot();
+      const txHash = String(body?.txHash || "").trim();
+      const encryptedErcAddress = normalizeAddress(body?.encryptedErcAddress || process.env.ENCRYPTED_ERC_ADDRESS || "");
+
+      if (!txHash) {
+        return jsonResponse(res, 400, { ok: false, error: "txHash is required" }, origin);
+      }
+
+      const result = await runHardhatScript({
+        encryptedErcRoot,
+        scriptFile: "decrypt-private-tx.ts",
+        extraEnv: {
+          TX_HASH: txHash,
+          ENCRYPTED_ERC_ADDRESS: encryptedErcAddress,
+        },
+      });
+
+      if (result.code !== 0) {
+        return jsonResponse(
+          res,
+          500,
+          {
+            ok: false,
+            error: "decrypt tx failed",
+            details: result.stderr || result.stdout,
+          },
+          origin,
+        );
+      }
+
+      return jsonResponse(
+        res,
+        200,
+        {
+          ok: true,
+          txHash,
+          output: result.stdout,
         },
         origin,
       );
