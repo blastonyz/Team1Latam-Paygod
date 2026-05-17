@@ -84,7 +84,7 @@ export default function SettingsPage() {
             <Toggle value={autoBlock} onChange={setAutoBlock} />
           </Row>
           <Row label="x402 payment per verification">
-            <span className="text-[13px] text-[#888]">0.0003 DoC</span>
+            <span className="text-[13px] text-[#888]">0.0003 AVAX</span>
           </Row>
         </Card>
 

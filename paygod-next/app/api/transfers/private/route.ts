@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 const transferHashRegex = /PRIVATE_TRANSFER_TX_HASH=(0x[a-fA-F0-9]{64})/;
 const zkBackendUrl = process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "";
+const forceLocalZk =
+  String(process.env.FORCE_LOCAL_ZK || process.env.NEXT_PUBLIC_FORCE_LOCAL_ZK || "false").toLowerCase() === "true";
 
 function runPrivateTransfer(recipient: string, transferAmountBaseUnits: string) {
   const encryptedErcRoot = path.resolve(process.cwd(), "..", "EncryptedERC");
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "recipient is required" }, { status: 400 });
     }
 
-    if (zkBackendUrl) {
+    if (zkBackendUrl && !forceLocalZk) {
       const response = await fetch(`${zkBackendUrl.replace(/\/$/, "")}/api/transfers/private`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

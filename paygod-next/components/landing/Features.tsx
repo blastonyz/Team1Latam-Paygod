@@ -27,7 +27,7 @@ const features = [
 
 export const Features: React.FC = () => (
   <section id="product" style={{ padding: "120px 24px", scrollMarginTop: 80 }}>
-    <div className="mx-auto flex flex-col items-center" style={{ maxWidth: 1120, width: "100%" }}>
+    <div className="w-full flex flex-col items-center justify-center" style={{ margin: "0 auto", maxWidth: 1120 }}>
       <p
         className="text-center uppercase font-medium"
         style={{ color: "var(--accent)", fontSize: 11, letterSpacing: "0.2em", marginBottom: 16 }}
@@ -41,7 +41,7 @@ export const Features: React.FC = () => (
         Everything institutions need. Nothing they don't.
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 w-full" style={{ gap: 16 }}>
+      <div className="grid grid-cols-1 md:grid-cols-3 w-full" style={{ gap: 24 }}>
         {features.map((f, i) => (
           <Reveal key={f.title} delay={i * 100}>
             <Card padding={28} className="h-full transition-colors duration-200 hover:border-[rgba(237,49,52,0.4)]">

@@ -182,7 +182,7 @@ const StepAmount: React.FC<{
         className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
         style={{ color: "var(--text-secondary)", fontSize: 13, fontWeight: 500 }}
       >
-        DoC
+        AVAX
       </span>
     </div>
     <div
@@ -344,7 +344,7 @@ const StepCompliance: React.FC<{
               x402
             </span>
             <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>
-              Verification cost: 0.0003 DoC charged via x402
+              Verification cost: 0.0003 AVAX charged via x402
             </span>
           </div>
         </div>
@@ -517,7 +517,7 @@ const StepConfirm: React.FC<{
           </span>
         </SummaryRow>
         <SummaryRow label="Amount">
-          <span className="text-white" style={{ fontWeight: 500 }}>{amount || "0"} DoC</span>
+          <span className="text-white" style={{ fontWeight: 500 }}>{amount || "0"} AVAX</span>
         </SummaryRow>
         <SummaryRow label="Network">
           <span
@@ -539,7 +539,7 @@ const StepConfirm: React.FC<{
           <span style={{ color: "var(--success)" }}>Approved — 94/100</span>
         </SummaryRow>
         <SummaryRow label="Verification cost">
-          <span style={{ color: "var(--text-secondary)" }}>0.0003 DoC via x402</span>
+          <span style={{ color: "var(--text-secondary)" }}>0.0003 AVAX via x402</span>
         </SummaryRow>
         <div style={{ borderTop: "1px solid var(--border)", margin: "8px 0" }} />
         <SummaryRow label="Estimated settlement">

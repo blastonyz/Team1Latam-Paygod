@@ -7,17 +7,11 @@ export const Hero: React.FC = () => {
   return (
     <section
       className="relative flex flex-col items-center justify-center text-center overflow-hidden"
-      style={{
-        minHeight: "100vh",
-        paddingTop: 140,
-        paddingBottom: 96,
-        paddingLeft: 24,
-        paddingRight: 24,
-      }}
+      style={{ marginTop: 100 }}
     >
       <GridShader intensity="med" />
 
-      <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center">
+      <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center mt-6">
         <p
           className="fade-up uppercase font-medium"
           style={{
@@ -60,7 +54,7 @@ export const Hero: React.FC = () => {
         </p>
 
         <div className="fade-up flex flex-wrap items-center justify-center" style={{ marginTop: 40, animationDelay: "300ms" }}>
-          <Link href="/app_/onboarding">
+          <Link href="/app_/onboarding" prefetch={false}>
             <Button variant="primary" size="lg">Request Access</Button>
           </Link>
         </div>

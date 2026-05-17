@@ -99,7 +99,7 @@ export default function OverviewPage() {
           <Label>Total Volume</Label>
           <Value>
             {MOCK_STATS.totalVolume}{" "}
-            <span style={{ fontSize: 18, fontWeight: 600, color: "var(--text-secondary)" }}>DoC</span>
+            <span style={{ fontSize: 18, fontWeight: 600, color: "var(--text-secondary)" }}>AVAX</span>
           </Value>
           <div className="flex items-center gap-1 mt-3" style={{ color: "var(--success)", fontSize: 12 }}>
             <ArrowUp size={12} strokeWidth={2} />

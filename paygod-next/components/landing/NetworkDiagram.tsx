@@ -33,7 +33,7 @@ const InstitutionNode: React.FC<{ label: string; align?: "left" | "right" }> = (
       className="font-mono"
       style={{ color: "#666", fontSize: 10, marginTop: 4 }}
     >
-      •••• DoC
+      •••• AVAX
     </div>
   </div>
 );

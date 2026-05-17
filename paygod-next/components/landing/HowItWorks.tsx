@@ -46,7 +46,7 @@ const Arrow = ({ vertical }: { vertical?: boolean }) => (
 
 export const HowItWorks: React.FC = () => (
   <section id="how-it-works" style={{ padding: "120px 24px", backgroundColor: "#0A0A0A", scrollMarginTop: 80 }}>
-    <div className="mx-auto flex flex-col items-center" style={{ maxWidth: 1120, width: "100%" }}>
+    <div className="w-full flex flex-col items-center justify-center" style={{ margin: "0 auto", maxWidth: 1120 }}>
       <p
         className="text-center uppercase font-medium"
         style={{ color: "var(--accent)", fontSize: 11, letterSpacing: "0.2em", marginBottom: 16 }}
@@ -60,7 +60,7 @@ export const HowItWorks: React.FC = () => (
         How a confidential transfer works.
       </h2>
 
-      <div className="flex flex-col md:flex-row items-stretch md:items-start justify-center w-full" style={{ gap: 8 }}>
+      <div className="flex flex-col md:flex-row items-stretch md:items-start justify-center w-full" style={{ gap: 16 }}>
         {steps.map((s, idx) => (
           <div key={s.n} className="flex flex-col md:flex-row items-center md:items-start flex-1">
             <div className="flex flex-col items-center text-center px-2 flex-1">

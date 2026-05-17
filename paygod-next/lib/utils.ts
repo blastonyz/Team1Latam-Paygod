@@ -11,6 +11,6 @@ export function truncateAddress(address: string): string {
 }
 
 export function formatAmount(amount: number, encrypted: boolean = true): string {
-  if (encrypted) return "••••• DoC";
-  return `${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DoC`;
+  if (encrypted) return "••••• AVAX";
+  return `${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AVAX`;
 }
