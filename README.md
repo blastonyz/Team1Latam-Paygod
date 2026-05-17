@@ -9,6 +9,26 @@ This README is the operational guide for:
 - Cloud Run deployment
 - live demo checklist and troubleshooting
 
+---
+
+## 🎯 **LIVE DEMO - TEST WALLET REGISTRATION**
+
+> **To register and test a new wallet:**
+> 1. Go to https://team1-latam-paygod.vercel.app/app/settings
+> 2. Scroll down to **"Live Demo Ops"** section
+> 3. Fill in:
+>    - **Wallet address**: your test address
+>    - **Wallet private key**: corresponding private key
+> 4. Click **"Register Wallet"** and wait for confirmation
+> 
+> **Pre-registered test wallets** (already on Fuji):
+> - `0x0571235134DC15a00f02916987C2c16b5fC52E2A`
+> - `0x90813c2C61EE01857c2fDfD003f5272b540a7AA7`
+>
+> Use these to test transfers and auditor operations.
+
+---
+
 ## 1) Monorepo Overview
 
 Top-level modules:
