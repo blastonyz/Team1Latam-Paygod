@@ -6,6 +6,8 @@ const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
 const transferHashRegex = /PRIVATE_TRANSFER_TX_HASH=(0x[a-fA-F0-9]{64})/;
 const genericTxHashRegex = /(0x[a-fA-F0-9]{64})/;
+const registerHashRegex = /REGISTER_WALLET_TX_HASH=(ALREADY_REGISTERED|0x[a-fA-F0-9]{64})/;
+const registeredAddressRegex = /REGISTERED_ADDRESS=(0x[a-fA-F0-9]{40})/;
 const addressRegex = /(0x[a-fA-F0-9]{40})/;
 
 const fixedMode = String(process.env.DEMO_FIXED_MODE || "true").toLowerCase() === "true";
@@ -253,8 +255,14 @@ const server = http.createServer(async (req, res) => {
         );
       }
 
-      const txHash = firstTxHash(result.stdout);
-      const registeredAddress = targetAddress || (String(result.stdout).match(addressRegex)?.[1] ?? "");
+      const txMatch = String(result.stdout).match(registerHashRegex);
+      const txMarker = txMatch?.[1] || null;
+      const txHash = txMarker && txMarker !== "ALREADY_REGISTERED" ? txMarker : null;
+      const alreadyRegistered = txMarker === "ALREADY_REGISTERED";
+      const registeredAddress =
+        String(result.stdout).match(registeredAddressRegex)?.[1] ||
+        targetAddress ||
+        (String(result.stdout).match(addressRegex)?.[1] ?? "");
 
       return jsonResponse(
         res,
@@ -262,6 +270,7 @@ const server = http.createServer(async (req, res) => {
         {
           ok: true,
           txHash,
+          alreadyRegistered,
           registeredAddress,
           snowtraceUrl: txHash ? `https://testnet.snowtrace.io/tx/${txHash}` : null,
         },
