@@ -1,0 +1,5 @@
+﻿steps:
+- name: gcr.io/cloud-builders/docker
+  args: ['build','-f','zk-prover-backend/Dockerfile','-t','gcr.io/zk-prover-backend/team1latam-paygod-zk','.']
+images:
+- 'gcr.io/zk-prover-backend/team1latam-paygod-zk'
