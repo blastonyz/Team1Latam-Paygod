@@ -2,7 +2,12 @@
 @import "./styles/animations.css";
 @import "tailwindcss";
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+@source "../app/**/*.{ts,tsx}";
+@source "../components/**/*.{ts,tsx}";
+@source "../hooks/**/*.{ts,tsx}";
+@source "../lib/**/*.{ts,tsx}";
+
+*, *::before, *::after { box-sizing: border-box; }
 
 :root {
   --background: #000000;
@@ -25,6 +30,7 @@ html, body {
   color: var(--text-primary);
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  margin: 0;
 }
 html { scroll-behavior: smooth; }
 

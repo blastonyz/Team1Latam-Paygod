@@ -151,19 +151,19 @@ export default function OverviewPage() {
         </Card>
       </div>
 
-      <div style={{ marginTop: 40 }}>
-        <div className="flex items-center justify-between mb-4">
+      <div className="mt-10 flex flex-col items-center gap-6">
+        <div className="flex items-center justify-between mb-4 w-full">
           <h2 className="text-white" style={{ fontSize: 16, fontWeight: 700 }}>Recent Transfers</h2>
           <Link href="/app/audit-log">
             <Button variant="ghost" size="sm">View all</Button>
           </Link>
         </div>
 
-        <Card padding={0}>
+        <Card padding={0} className="w-full">
           <Table columns={columns} data={displayTransactions as TransactionRow[]} />
         </Card>
 
-        <p className="mt-4 uppercase" style={{ color: "var(--text-secondary)", fontSize: 11, letterSpacing: "0.05em", textAlign: "center" }}>
+        <p className="uppercase text-center m-0 p-0 w-full" style={{ color: "var(--text-secondary)", fontSize: 11, letterSpacing: "0.05em" }}>
           All amounts are encrypted on-chain using eERC20.
         </p>
       </div>
