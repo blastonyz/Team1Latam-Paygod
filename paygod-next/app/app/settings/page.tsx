@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, CheckCircle, XCircle, ExternalLink } from "lucide-react";
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { MOCK_INSTITUTION } from "@/lib/mockAuth";
+import encryptedErcArtifact from "@/lib/abi/EncryptedERC.json";
+import registrarArtifact from "@/lib/abi/Registrar.json";
+import { useWeb3App } from "@/contexts/web3-app-context";
 
 interface OpResult {
   ok?: boolean;
@@ -15,9 +19,19 @@ interface OpResult {
   alreadyRegistered?: boolean;
   registeredAddress?: string;
   auditorAddress?: string;
+  registrarAddress?: string | null;
   decrypted?: any;
   snowtraceUrl?: string | null;
   output?: string;
+  proof?: {
+    proofPoints: {
+      a: [string, string];
+      b: [[string, string], [string, string]];
+      c: [string, string];
+    };
+    publicSignals: [string, string, string, string, string];
+  } | null;
+  registerMode?: string;
 }
 
 const Label = ({ children }: { children: React.ReactNode }) => (
@@ -53,10 +67,11 @@ const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 );
 
 export default function SettingsPage() {
+  const { address, isConnected } = useAccount();
+  const { encryptedErcAddress } = useWeb3App();
   const [agent, setAgent] = useState(true);
   const [autoBlock, setAutoBlock] = useState(true);
-  const [registerAddress, setRegisterAddress] = useState("0x90813c2C61EE01857c2fDfD003f5272b540a7AA7");
-  const [registerPrivateKey, setRegisterPrivateKey] = useState("");
+  const [registerAddress, setRegisterAddress] = useState("");
   const [auditorAddress, setAuditorAddress] = useState("0x90813c2C61EE01857c2fDfD003f5272b540a7AA7");
   const [decryptTxHash, setDecryptTxHash] = useState("0xa15ebfdd2e2e917b2ca51fcf3a1a35536da97e5e3a5707d8aa904ff38cfe52bb");
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -66,9 +81,37 @@ export default function SettingsPage() {
   const [auditorResult, setAuditorResult] = useState<OpResult | null>(null);
   const [decryptResult, setDecryptResult] = useState<OpResult | null>(null);
 
+  const { data: registrarAddress } = useReadContract({
+    address: encryptedErcAddress,
+    abi: encryptedErcArtifact.abi,
+    functionName: "registrar",
+    query: { enabled: Boolean(encryptedErcAddress) },
+  });
+
+  const { writeContractAsync, data: registerTxHash, isPending: isSubmittingRegisterTx } = useWriteContract();
+  const { isLoading: isWaitingRegisterTx } = useWaitForTransactionReceipt({
+    hash: registerTxHash,
+    query: { enabled: Boolean(registerTxHash) },
+  });
+
+  useEffect(() => {
+    if (address) {
+      setRegisterAddress(address);
+    }
+  }, [address]);
+
   const copy = () => {
     navigator.clipboard?.writeText(MOCK_INSTITUTION.wallet).catch(() => {});
   };
+
+  const parseRegisterProof = (proof: NonNullable<OpResult["proof"]>) => ({
+    proofPoints: {
+      a: proof.proofPoints.a.map((value) => BigInt(value)) as [bigint, bigint],
+      b: proof.proofPoints.b.map((pair) => pair.map((value) => BigInt(value)) as [bigint, bigint]) as [[bigint, bigint], [bigint, bigint]],
+      c: proof.proofPoints.c.map((value) => BigInt(value)) as [bigint, bigint],
+    },
+    publicSignals: proof.publicSignals.map((value) => BigInt(value)) as [bigint, bigint, bigint, bigint, bigint],
+  });
 
   const ResultDisplay = ({ result }: { result: OpResult | null }) => {
     if (!result) return null;
@@ -142,6 +185,21 @@ export default function SettingsPage() {
 
   const runRegister = async () => {
     try {
+      if (!address || !isConnected) {
+        setRegisterResult({ ok: false, error: "Connect the wallet you want to register first." });
+        return;
+      }
+
+      if (!registrarAddress) {
+        setRegisterResult({ ok: false, error: "Registrar is not available yet." });
+        return;
+      }
+
+      if (registerAddress.trim().toLowerCase() !== address.toLowerCase()) {
+        setRegisterResult({ ok: false, error: "Registration must use the connected wallet address." });
+        return;
+      }
+
       setRegisterLoading(true);
       setRegisterResult(null);
       const response = await fetch("/api/users/register", {
@@ -149,11 +207,39 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           address: registerAddress.trim(),
-          privateKey: registerPrivateKey.trim(),
+          registrarAddress,
         }),
       });
       const payload = await response.json();
-      setRegisterResult(payload);
+
+      if (!response.ok) {
+        setRegisterResult(payload);
+        return;
+      }
+
+      if (payload.alreadyRegistered) {
+        setRegisterResult(payload);
+        return;
+      }
+
+      if (!payload.proof) {
+        setRegisterResult({ ok: false, error: "Register proof was not returned by the backend." });
+        return;
+      }
+
+      const txHash = await writeContractAsync({
+        address: (payload.registrarAddress || registrarAddress) as `0x${string}`,
+        abi: registrarArtifact.abi,
+        functionName: "register",
+        args: [parseRegisterProof(payload.proof)],
+      });
+
+      setRegisterResult({
+        ...payload,
+        ok: true,
+        txHash,
+        snowtraceUrl: `https://testnet.snowtrace.io/tx/${txHash}`,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "unexpected error";
       setRegisterResult({ ok: false, error: message });
@@ -265,16 +351,14 @@ export default function SettingsPage() {
             <Input
               value={registerAddress}
               onChange={(e) => setRegisterAddress(e.target.value)}
-              placeholder="Wallet address"
+              placeholder="Connected wallet address"
+              readOnly={Boolean(address)}
             />
-            <Input
-              type="password"
-              value={registerPrivateKey}
-              onChange={(e) => setRegisterPrivateKey(e.target.value)}
-              placeholder="Wallet private key"
-            />
-            <Button variant="primary" size="sm" onClick={runRegister} loading={registerLoading}>
-              Register Wallet
+            <div className="text-[11px] text-[#888]">
+              Registration proof is generated server-side, but the connected wallet signs the on-chain register transaction.
+            </div>
+            <Button variant="primary" size="sm" onClick={runRegister} loading={registerLoading || isSubmittingRegisterTx || isWaitingRegisterTx}>
+              {isSubmittingRegisterTx || isWaitingRegisterTx ? "Submitting Register Tx" : "Register Connected Wallet"}
             </Button>
             <ResultDisplay result={registerResult} />
           </div>

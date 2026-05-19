@@ -1,14 +1,20 @@
 # zk-prover-backend
 
-Backend service that executes EncryptedERC Hardhat scripts and exposes demo-friendly HTTP endpoints for:
-- private transfer execution
-- wallet registration
-- auditor setup
-- private tx decryption
+Backend service that executes EncryptedERC Hardhat scripts and exposes non-custodial HTTP endpoints for:
+- wallet registration proof generation (`POST /api/users/register`)
+- health/status (`GET /health`)
+
+## Security-first production mode
+
+Recommended when service is public:
+- keep only `POST /api/users/register` enabled
+- set a strict `ALLOWED_ORIGIN` (no `*`)
+- enable backend API token if you choose to protect register behind server-to-server calls
+- keep Cloud Run unauthenticated only if your endpoint-level controls are active
 
 ## Local run
 
-1. Copy `.env.example` to `.env` and complete `AVA_PK` and `AVA_PK2`.
+1. Copy `.env.example` to `.env`.
 2. Make sure `EncryptedERC` dependencies are installed.
 3. Start service:
 
@@ -22,44 +28,18 @@ Health check:
 curl http://localhost:8080/health
 ```
 
-Transfer endpoint:
-
-```bash
-curl -X POST http://localhost:8080/api/transfers/private \
-  -H "Content-Type: application/json" \
-  -d '{"recipient":"0x90813c2C61EE01857c2fDfD003f5272b540a7AA7","amount":"25.00"}'
-```
-
-If `DEMO_FIXED_MODE=true`, request recipient/amount are ignored and fixed env values are used.
-
 Register wallet endpoint:
 
 ```bash
 curl -X POST http://localhost:8080/api/users/register \
   -H "Content-Type: application/json" \
-  -d '{"privateKey":"<WALLET_PRIVATE_KEY_HEX>","address":"0x90813c2C61EE01857c2fDfD003f5272b540a7AA7"}'
-```
-
-Set auditor endpoint:
-
-```bash
-curl -X POST http://localhost:8080/api/auditor/set \
-  -H "Content-Type: application/json" \
-  -d '{"auditorAddress":"0x90813c2C61EE01857c2fDfD003f5272b540a7AA7"}'
-```
-
-Decrypt tx endpoint:
-
-```bash
-curl -X POST http://localhost:8080/api/tx/decrypt \
-  -H "Content-Type: application/json" \
-  -d '{"txHash":"0x<PRIVATE_TX_HASH>"}'
+  -d '{"address":"0x90813c2C61EE01857c2fDfD003f5272b540a7AA7"}'
 ```
 
 Notes:
-- `api/users/register` requires the wallet private key used to sign the registration tx.
-- `api/auditor/set` requires the auditor to be previously registered.
-- `api/tx/decrypt` uses local auditor private keys (`AVA_PK`, `AVA_PK1`, `AVA_PK2`, `AVA_PK3`) to decrypt.
+- `api/users/register` returns a registration proof and does not require wallet private keys.
+- On-chain `register()` must be signed by the connected wallet in the frontend.
+- Custodial endpoints were removed by design (no backend private-key signing/decryption).
 
 ## Cloud Run deploy
 
@@ -77,7 +57,8 @@ gcloud run deploy team1latam-paygod \
   --cpu 2 \
   --timeout 900 \
   --concurrency 1 \
-  --update-env-vars "ENCRYPTED_ERC_ROOT=/app/EncryptedERC,DEMO_FIXED_MODE=true,DEMO_RECIPIENT_ADDRESS=0x90813c2C61EE01857c2fDfD003f5272b540a7AA7,DEMO_TRANSFER_AMOUNT_BASE_UNITS=2500,DEMO_MINT_AMOUNT_BASE_UNITS=10000,AVA_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc,AVA_PK=<TEST_PRIVATE_KEY_1>,AVA_PK2=<TEST_PRIVATE_KEY_2>,ALLOWED_ORIGIN=*"
+  --set-env-vars "ENCRYPTED_ERC_ROOT=/app/EncryptedERC,PAYGOD_RUNTIME_MODE=production,ALLOWED_ORIGIN=https://team1-latam-paygod.vercel.app,REQUIRE_API_AUTH=false,ENABLE_REGISTER_ENDPOINT=true,RATE_LIMIT_WINDOW_MS=60000,RATE_LIMIT_MAX_REQUESTS=20"
 ```
 
 Then use your Cloud Run URL in frontend env: `NEXT_PUBLIC_ZK_BACKEND_URL=https://<service-url>`.
+If backend auth is enabled, also set frontend server env: `ZK_BACKEND_API_TOKEN=<STRONG_TOKEN>`.

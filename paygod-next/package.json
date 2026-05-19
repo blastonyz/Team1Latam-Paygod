@@ -3,9 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node ./scripts/next-runner.mjs dev",
+    "dev:local": "node ./scripts/next-runner.mjs dev --local",
+    "build": "node ./scripts/next-runner.mjs build",
+    "build:local": "node ./scripts/next-runner.mjs build --local",
+    "start": "node ./scripts/next-runner.mjs start",
+    "start:local": "node ./scripts/next-runner.mjs start --local",
     "lint": "next lint",
     "sync:abis": "node ./scripts/sync-abis-from-encryptederc.mjs"
   },

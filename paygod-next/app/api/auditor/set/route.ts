@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const txHashRegex = /(0x[a-fA-F0-9]{64})/;
 const sanitizeUrlEnv = (value: string) => value.trim().replace(/^['\"]+|['\"]+$/g, "");
 const zkBackendUrl = sanitizeUrlEnv(process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "");
+const backendApiToken = String(process.env.ZK_BACKEND_API_TOKEN || "").trim();
 const forceLocalZk =
   String(process.env.FORCE_LOCAL_ZK || process.env.NEXT_PUBLIC_FORCE_LOCAL_ZK || "false").toLowerCase() === "true";
 
@@ -53,9 +54,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (zkBackendUrl && !forceLocalZk) {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (backendApiToken) {
+        headers["x-api-key"] = backendApiToken;
+      }
+
       const response = await fetch(`${zkBackendUrl.replace(/\/$/, "")}/api/auditor/set`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ auditorAddress, encryptedErcAddress }),
         cache: "no-store",
       });

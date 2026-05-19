@@ -3,7 +3,7 @@
 
 // SPDX-License-Identifier: Ecosystem
 
-pragma solidity 0.8.27;
+pragma solidity ^0.8.27;
 
 import {Point, RegisterProof} from "./types/Types.sol";
 import {IRegistrationVerifier} from "./interfaces/verifiers/IRegistrationVerifier.sol";
@@ -13,6 +13,7 @@ import {UserAlreadyRegistered, InvalidChainId, InvalidSender, InvalidRegistratio
 import {BabyJubJub} from "./libraries/BabyJubJub.sol";
 
 /**
+ * @author AvaCLoud Team
  * @title Registrar
  * @notice Contract for managing user registration in the privacy-preserving ERC system
  * @dev This contract handles:

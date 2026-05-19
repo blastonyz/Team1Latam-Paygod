@@ -9,6 +9,7 @@ const ENCRYPTED_ERC_ADDRESS =
 
 const sanitizeUrlEnv = (value: string) => value.trim().replace(/^['\"]+|['\"]+$/g, "");
 const zkBackendUrl = sanitizeUrlEnv(process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "");
+const backendApiToken = String(process.env.ZK_BACKEND_API_TOKEN || "").trim();
 const forceLocalZk =
   String(process.env.FORCE_LOCAL_ZK || process.env.NEXT_PUBLIC_FORCE_LOCAL_ZK || "false").toLowerCase() === "true";
 
@@ -47,9 +48,14 @@ export async function POST(request: NextRequest) {
   if (!txHash) return NextResponse.json({ ok: false, error: "txHash is required" }, { status: 400 });
 
   if (zkBackendUrl && !forceLocalZk) {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (backendApiToken) {
+      headers["x-api-key"] = backendApiToken;
+    }
+
     const response = await fetch(`${zkBackendUrl.replace(/\/$/, "")}/api/tx/decrypt`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ txHash, encryptedErcAddress: ENCRYPTED_ERC_ADDRESS }),
       cache: "no-store",
     });
