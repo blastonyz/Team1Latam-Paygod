@@ -21,6 +21,8 @@ RUN npx hardhat zkit verifiers
 # Return to backend runtime
 WORKDIR /app/zk-prover-backend
 COPY zk-prover-backend/server.mjs ./server.mjs
+COPY zk-prover-backend/router.mjs ./router.mjs
+COPY zk-prover-backend/zk-functions ./zk-functions
 
 ENV ENCRYPTED_ERC_ROOT=/app/EncryptedERC
 ENV PORT=8080
