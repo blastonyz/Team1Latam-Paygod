@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Table, type TableColumn } from "@/components/ui/Table";
 import { MOCK_STATS, MOCK_TRANSFERS, type MockTransfer } from "@/lib/mockData";
+import { useRealtimeTransactions } from "@/hooks/useRealtimeTransactions";
+import { Transaction } from "@/lib/supabase";
 
 const Label = ({ children }: { children: React.ReactNode }) => (
   <div
@@ -52,26 +54,39 @@ const ScoreRing = ({ value, size = 56 }: { value: number; size?: number }) => {
   );
 };
 
-const columns: TableColumn<MockTransfer>[] = [
+type TransactionRow = MockTransfer | Transaction;
+
+const columns: TableColumn<TransactionRow>[] = [
   {
     key: "id",
     header: "TX Hash",
-    render: (r) => <span className="font-mono" style={{ color: "var(--text-secondary)", fontSize: 13 }}>{r.id}</span>,
+    render: (r) => {
+      const txHash = (r as any).id || (r as any).tx_hash || "";
+      const displayHash = txHash.length > 10 ? txHash.substring(0, 10) + "..." : txHash;
+      return <span className="font-mono" style={{ color: "var(--text-secondary)", fontSize: 13 }}>{displayHash}</span>;
+    },
   },
   {
     key: "amount",
     header: "Amount",
-    render: (r) => <span className="text-white" style={{ fontSize: 13, fontWeight: 500 }}>{r.amount}</span>,
+    render: (r) => {
+      const amount = (r as any).amount || (r as any).amount_encrypted || "••••• AVAX";
+      return <span className="text-white" style={{ fontSize: 13, fontWeight: 500 }}>{amount}</span>;
+    },
   },
   {
     key: "recipient",
     header: "Recipient",
-    render: (r) => <span className="font-mono" style={{ color: "var(--text-secondary)", fontSize: 13 }}>{r.recipient}</span>,
+    render: (r) => {
+      const recipient = (r as any).recipient || (r as any).recipient_wallet || "";
+      const displayRecipient = recipient.length > 10 ? recipient.substring(0, 10) + "..." : recipient;
+      return <span className="font-mono" style={{ color: "var(--text-secondary)", fontSize: 13 }}>{displayRecipient}</span>;
+    },
   },
   {
     key: "status",
     header: "Status",
-    render: (r) => <Badge variant={r.status} />,
+    render: (r) => <Badge variant={(r as any).status} />,
   },
   {
     key: "timestamp",
@@ -81,7 +96,10 @@ const columns: TableColumn<MockTransfer>[] = [
 ];
 
 export default function OverviewPage() {
-  const recent = MOCK_TRANSFERS.slice(0, 6);
+  const { transactions, loading, error } = useRealtimeTransactions(6);
+  
+  // Use Supabase transactions if available and loaded, fallback to mock data
+  const displayTransactions = (transactions && transactions.length > 0) ? transactions : MOCK_TRANSFERS.slice(0, 6);
 
   return (
     <div>
@@ -142,10 +160,10 @@ export default function OverviewPage() {
         </div>
 
         <Card padding={0}>
-          <Table columns={columns} data={recent} />
+          <Table columns={columns} data={displayTransactions as TransactionRow[]} />
         </Card>
 
-        <p className="text-center mt-4 uppercase" style={{ color: "var(--text-secondary)", fontSize: 11, letterSpacing: "0.05em" }}>
+        <p className="mt-4 uppercase" style={{ color: "var(--text-secondary)", fontSize: 11, letterSpacing: "0.05em", textAlign: "center" }}>
           All amounts are encrypted on-chain using eERC20.
         </p>
       </div>
