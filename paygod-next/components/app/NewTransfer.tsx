@@ -402,12 +402,19 @@ const StepConfirm: React.FC<{
   const isConfirmedTx = submitted;
 
   const executeTransfer = async () => {
+    const cleanRecipient = recipient.trim();
+    const cleanAmount = amount.trim().replace(",", ".");
+
     if (!isConnected) {
       setSubmitError("Connect your wallet to execute the transfer.");
       return;
     }
-    if (!isAddress(recipient)) {
+    if (!isAddress(cleanRecipient)) {
       setSubmitError("Recipient address is invalid.");
+      return;
+    }
+    if (!/^\d+(\.\d{1,2})?$/.test(cleanAmount)) {
+      setSubmitError("Amount must have up to 2 decimals.");
       return;
     }
 
@@ -417,7 +424,7 @@ const StepConfirm: React.FC<{
       const response = await fetch("/api/transfers/private", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipient, amount }),
+        body: JSON.stringify({ recipient: cleanRecipient, amount: cleanAmount }),
       });
 
       const payload = (await response.json()) as {

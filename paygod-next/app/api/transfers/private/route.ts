@@ -6,11 +6,34 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const transferHashRegex = /PRIVATE_TRANSFER_TX_HASH=(0x[a-fA-F0-9]{64})/;
+const evmAddressRegex = /^0x[a-fA-F0-9]{40}$/;
 const sanitizeUrlEnv = (value: string) => value.trim().replace(/^['\"]+|['\"]+$/g, "");
 const zkBackendUrl = sanitizeUrlEnv(process.env.ZK_BACKEND_URL || process.env.NEXT_PUBLIC_ZK_BACKEND_URL || "");
 const backendApiToken = String(process.env.ZK_BACKEND_API_TOKEN || "").trim();
 const forceLocalZk =
   String(process.env.FORCE_LOCAL_ZK || process.env.NEXT_PUBLIC_FORCE_LOCAL_ZK || "false").toLowerCase() === "true";
+
+function normalizeRecipient(value: unknown) {
+  return String(value || "").trim();
+}
+
+function normalizeAmount(value: unknown) {
+  return String(value || "").trim().replace(",", ".");
+}
+
+function isSyntaxError(error: unknown): error is SyntaxError {
+  return error instanceof SyntaxError;
+}
+
+async function parseJsonSafely(response: Response) {
+  const raw = await response.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "invalid backend response", details: raw };
+  }
+}
 
 function runPrivateTransfer(recipient: string, transferAmountBaseUnits: string) {
   const encryptedErcRoot = path.resolve(process.cwd(), "..", "EncryptedERC");
@@ -56,12 +79,25 @@ function toBaseUnits(amount: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const recipient = String(body?.recipient || "").trim();
-    const amount = String(body?.amount || "").trim();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch (error) {
+      if (isSyntaxError(error)) {
+        return NextResponse.json({ ok: false, error: "invalid json payload" }, { status: 400 });
+      }
+      throw error;
+    }
 
-    if (!recipient) {
-      return NextResponse.json({ ok: false, error: "recipient is required" }, { status: 400 });
+    const recipient = normalizeRecipient((body as { recipient?: unknown } | null)?.recipient);
+    const amount = normalizeAmount((body as { amount?: unknown } | null)?.amount);
+
+    if (!evmAddressRegex.test(recipient)) {
+      return NextResponse.json({ ok: false, error: "recipient is required and must be a valid address" }, { status: 400 });
+    }
+
+    if (!/^\d+(\.\d{1,2})?$/.test(amount || "0")) {
+      return NextResponse.json({ ok: false, error: "amount must have up to 2 decimals" }, { status: 400 });
     }
 
     if (zkBackendUrl && !forceLocalZk) {
@@ -77,7 +113,7 @@ export async function POST(request: NextRequest) {
         cache: "no-store",
       });
 
-      const payload = await response.json();
+      const payload = await parseJsonSafely(response);
       return NextResponse.json(payload, { status: response.status });
     }
 
