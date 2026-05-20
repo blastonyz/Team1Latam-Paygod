@@ -133,7 +133,7 @@ const generateMintCalldata = async (
     AuditorPCTRandom: auditorEncRandom,
   };
 
-  const mintCircuit = (await zkit.getCircuit("MintCircuit")) as MintCircuit;
+  const mintCircuit = (await zkit.getCircuit("MintCircuit")) as unknown as MintCircuit;
   const proof = await mintCircuit.generateProof(input);
   return (await mintCircuit.generateCalldata(proof)) as CalldataMintCircuitGroth16;
 };
@@ -198,7 +198,7 @@ const generateTransferCalldata = async (
     AuditorPCTRandom: auditorEncRandom,
   };
 
-  const transferCircuit = (await zkit.getCircuit("TransferCircuit")) as TransferCircuit;
+  const transferCircuit = (await zkit.getCircuit("TransferCircuit")) as unknown as TransferCircuit;
   const proof = await transferCircuit.generateProof(input);
   const calldata = (await transferCircuit.generateCalldata(proof)) as CalldataTransferCircuitGroth16;
 
