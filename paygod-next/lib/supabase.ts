@@ -77,12 +77,16 @@ export function subscribeToTransactions(
   }
 
   const subscription = supabase
-    .from("transactions")
-    .on("*", (payload) => {
-      if (payload.new) {
-        callback(payload.new as Transaction);
-      }
-    })
+    .channel("transactions-changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "transactions" },
+      (payload) => {
+        if (payload.new) {
+          callback(payload.new as Transaction);
+        }
+      },
+    )
     .subscribe();
 
   return subscription;
