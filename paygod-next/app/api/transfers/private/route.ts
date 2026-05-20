@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import path from "node:path";
 
 export const runtime = "nodejs";
@@ -33,6 +34,11 @@ async function parseJsonSafely(response: Response) {
   } catch {
     return { ok: false, error: "invalid backend response", details: raw };
   }
+}
+
+function summarizeForLog(value: string, limit = 500) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > limit ? `${normalized.slice(0, limit)}...` : normalized;
 }
 
 function runPrivateTransfer(recipient: string, transferAmountBaseUnits: string) {
@@ -78,12 +84,15 @@ function toBaseUnits(amount: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = crypto.randomUUID();
+
   try {
     let body: unknown;
     try {
       body = await request.json();
     } catch (error) {
       if (isSyntaxError(error)) {
+        console.error("[transfer-api] invalid-json", { requestId });
         return NextResponse.json({ ok: false, error: "invalid json payload" }, { status: 400 });
       }
       throw error;
@@ -92,16 +101,20 @@ export async function POST(request: NextRequest) {
     const recipient = normalizeRecipient((body as { recipient?: unknown } | null)?.recipient);
     const amount = normalizeAmount((body as { amount?: unknown } | null)?.amount);
 
+    console.info("[transfer-api] request", { requestId, recipient, amount, mode: zkBackendUrl && !forceLocalZk ? "remote" : "local" });
+
     if (!evmAddressRegex.test(recipient)) {
+      console.error("[transfer-api] invalid-recipient", { requestId, recipient });
       return NextResponse.json({ ok: false, error: "recipient is required and must be a valid address" }, { status: 400 });
     }
 
     if (!/^\d+(\.\d{1,2})?$/.test(amount || "0")) {
+      console.error("[transfer-api] invalid-amount", { requestId, amount });
       return NextResponse.json({ ok: false, error: "amount must have up to 2 decimals" }, { status: 400 });
     }
 
     if (zkBackendUrl && !forceLocalZk) {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const headers: Record<string, string> = { "Content-Type": "application/json", "x-request-id": requestId };
       if (backendApiToken) {
         headers["x-api-key"] = backendApiToken;
       }
@@ -114,12 +127,25 @@ export async function POST(request: NextRequest) {
       });
 
       const payload = await parseJsonSafely(response);
+      console.info("[transfer-api] upstream-response", {
+        requestId,
+        status: response.status,
+        ok: response.ok,
+        payload: summarizeForLog(JSON.stringify(payload)),
+      });
       return NextResponse.json(payload, { status: response.status });
     }
 
     const transferAmountBaseUnits = toBaseUnits(amount || "0");
 
     const { stdout, stderr, code } = await runPrivateTransfer(recipient, transferAmountBaseUnits);
+
+    console.info("[transfer-api] local-script-result", {
+      requestId,
+      code,
+      stdout: summarizeForLog(stdout),
+      stderr: summarizeForLog(stderr),
+    });
 
     if (code !== 0) {
       return NextResponse.json(
@@ -151,6 +177,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unexpected error";
+    console.error("[transfer-api] unexpected-error", { requestId, message });
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
