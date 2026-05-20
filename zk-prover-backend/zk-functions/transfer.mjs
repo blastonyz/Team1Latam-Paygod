@@ -40,25 +40,41 @@ export async function buildPrivateTransfer(body) {
     },
   });
 
+  const stdout = String(result.stdout || "");
+  const stderr = String(result.stderr || "");
+  const combinedOutput = `${stdout}\n${stderr}`;
+  const match = combinedOutput.match(transferHashRegex);
+
+  // If the tx hash is present, treat as success even if post-processing in script failed.
+  if (match) {
+    return {
+      status: 200,
+      payload: {
+        ok: true,
+        txHash: match[1],
+        snowtraceUrl: `https://testnet.snowtrace.io/tx/${match[1]}`,
+      },
+    };
+  }
+
   if (result.code !== 0) {
     return {
       status: 500,
       payload: {
         ok: false,
         error: "private transfer failed",
-        details: result.stderr || result.stdout,
+        details: stderr || stdout,
       },
     };
   }
 
-  const match = String(result.stdout).match(transferHashRegex);
   if (!match) {
     return {
       status: 500,
       payload: {
         ok: false,
         error: "tx hash not found in script output",
-        details: result.stdout,
+        details: stdout,
       },
     };
   }

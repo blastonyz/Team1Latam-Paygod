@@ -434,7 +434,7 @@ const StepConfirm: React.FC<{
         details?: string;
       };
 
-      if (!response.ok || !payload.ok || !payload.txHash) {
+      if (!payload.txHash) {
         const details = payload.error || payload.details || "Transfer execution failed.";
         throw new Error(details);
       }
