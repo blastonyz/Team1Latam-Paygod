@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert into Supabase transactions table
+    if (!supabase) {
+      return NextResponse.json(
+        { error: "Supabase not configured" },
+        { status: 503 }
+      );
+    }
+
     const { data, error } = await supabase.from("transactions").insert([
       {
         tx_hash: txHash,
