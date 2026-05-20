@@ -9,6 +9,7 @@ import {
   hasValidApiAuth,
 } from "./zk-functions/security.mjs";
 import { buildRegisterProof } from "./zk-functions/register.mjs";
+import { buildPrivateTransfer } from "./zk-functions/transfer.mjs";
 
 export function createRouter() {
   const router = Router();
@@ -56,6 +57,16 @@ export function createRouter() {
   router.post("/api/users/register", async (req, res) => {
     try {
       const { status, payload } = await buildRegisterProof(req.body || {});
+      return res.status(status).json(payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unexpected error";
+      return res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  router.post("/api/transfers/private", async (req, res) => {
+    try {
+      const { status, payload } = await buildPrivateTransfer(req.body || {});
       return res.status(status).json(payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : "unexpected error";

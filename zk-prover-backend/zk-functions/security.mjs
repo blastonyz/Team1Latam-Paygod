@@ -1,6 +1,7 @@
 import {
   apiAuthToken,
   enableRegister,
+  enableTransfer,
   isLocalMode,
   rateLimitMaxRequests,
   rateLimitWindowMs,
@@ -35,6 +36,7 @@ export function checkRateLimit(req) {
 
 export function endpointEnabled(pathname) {
   if (pathname === "/api/users/register") return enableRegister;
+  if (pathname === "/api/transfers/private") return enableTransfer;
   return false;
 }
 
@@ -55,6 +57,7 @@ export function getSecuritySnapshot() {
   return {
     requireApiAuth,
     enableRegister,
+    enableTransfer,
     rateLimitWindowMs,
     rateLimitMaxRequests,
     runtimeMode: isLocalMode ? "local" : "production",

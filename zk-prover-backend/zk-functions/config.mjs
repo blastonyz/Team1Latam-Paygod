@@ -14,5 +14,8 @@ export const requireApiAuth =
 export const enableRegister =
   String(process.env.ENABLE_REGISTER_ENDPOINT || "true").toLowerCase() === "true";
 
+export const enableTransfer =
+  String(process.env.ENABLE_TRANSFER_ENDPOINT || "false").toLowerCase() === "true";
+
 export const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000);
 export const rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS || (isLocalMode ? 1000 : 300));
