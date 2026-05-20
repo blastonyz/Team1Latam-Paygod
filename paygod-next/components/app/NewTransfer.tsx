@@ -12,7 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { isAddress } from "viem";
-import { usePublicClient, useReadContract } from "wagmi";
+import { usePublicClient, useReadContract, useSignMessage } from "wagmi";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -393,6 +393,7 @@ const StepConfirm: React.FC<{
 }> = ({ recipient, amount, onBack }) => {
   const router = useRouter();
   const { isConnected } = useWeb3App();
+  const { signMessageAsync } = useSignMessage();
   const [submitted, setSubmitted] = React.useState(false);
   const [txHash, setTxHash] = React.useState<`0x${string}` | null>(null);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -421,6 +422,16 @@ const StepConfirm: React.FC<{
     try {
       setIsSubmittingTx(true);
       setSubmitError(null);
+
+      await signMessageAsync({
+        message: [
+          "Authorize confidential transfer request",
+          `recipient: ${cleanRecipient}`,
+          `amount: ${cleanAmount}`,
+          `timestamp: ${new Date().toISOString()}`,
+        ].join("\n"),
+      });
+
       const response = await fetch("/api/transfers/private", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -442,7 +453,12 @@ const StepConfirm: React.FC<{
       setTxHash(payload.txHash);
       setSubmitted(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Transaction rejected.";
+      const message =
+        error instanceof Error && /rejected|denied|declined/i.test(error.message)
+          ? "Signature rejected by user."
+          : error instanceof Error
+            ? error.message
+            : "Transaction rejected.";
       setSubmitError(message);
     } finally {
       setIsSubmittingTx(false);
