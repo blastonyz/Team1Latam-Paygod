@@ -29,6 +29,11 @@ type BabyJubUser = {
   publicKey: [bigint, bigint];
 };
 
+type RecipientTarget = {
+  evmAddress: string;
+  publicKey: [bigint, bigint];
+};
+
 type StandaloneBalance = {
   eGCT: {
     c1: [bigint, bigint];
@@ -205,49 +210,55 @@ const generateTransferCalldata = async (
 
 async function main() {
   const signers = await ethers.getSigners();
-  if (signers.length < 2) {
-    throw new Error("Need at least two configured signers (AVA_PK and AVA_PK2)");
+  if (signers.length < 1) {
+    throw new Error("Need at least one configured signer (AVA_PK)");
   }
 
   const owner = signers[0];
-  const recipientAddressOverride = process.env.RECIPIENT_ADDRESS?.trim().toLowerCase();
-  const recipientSigner = recipientAddressOverride
-    ? signers.find((s) => s.address.toLowerCase() === recipientAddressOverride)
-    : signers[1];
+  const recipientAddress = process.env.RECIPIENT_ADDRESS?.trim() || signers[1]?.address || "";
 
-  if (!recipientSigner) {
-    throw new Error(`Recipient signer not found for RECIPIENT_ADDRESS=${process.env.RECIPIENT_ADDRESS}`);
+  if (!recipientAddress) {
+    throw new Error("Recipient address is required. Set RECIPIENT_ADDRESS or configure a second signer for local tests.");
   }
 
   const mintAmount = BigInt(process.env.MINT_AMOUNT_BASE_UNITS || DEFAULT_MINT_AMOUNT.toString());
   const transferAmount = BigInt(process.env.TRANSFER_AMOUNT_BASE_UNITS || DEFAULT_TRANSFER_AMOUNT.toString());
 
   const sender = buildUserFromEnv(owner.address, "AVA_PK");
-  const recipient = buildUserFromEnv(recipientSigner.address, "AVA_PK2");
 
   const encryptedERC = (await ethers.getContractAt("EncryptedERC", ENCRYPTED_ERC_ADDRESS)) as EncryptedERC;
   const registrarAddress = await encryptedERC.registrar();
   const registrar = (await ethers.getContractAt("Registrar", registrarAddress)) as Registrar;
 
+  const recipientKeyOnChain = await registrar.getUserPublicKey(recipientAddress);
+  const recipientPublicKey: [bigint, bigint] = [
+    BigInt(recipientKeyOnChain[0].toString()),
+    BigInt(recipientKeyOnChain[1].toString()),
+  ];
+
+  if (recipientPublicKey[0] === 0n && recipientPublicKey[1] === 0n) {
+    throw new Error(`Recipient ${recipientAddress} is not registered in Registrar.`);
+  }
+
+  const recipient: RecipientTarget = {
+    evmAddress: recipientAddress,
+    publicKey: recipientPublicKey,
+  };
+
   console.table({
     encryptedERC: ENCRYPTED_ERC_ADDRESS,
     registrar: registrarAddress,
     owner: owner.address,
-    recipient: recipientSigner.address,
+    recipient: recipient.evmAddress,
     tokenId: TOKEN_ID.toString(),
     mintAmountBaseUnits: mintAmount.toString(),
     transferAmountBaseUnits: transferAmount.toString(),
   });
 
   const senderKeyOnChain = await registrar.getUserPublicKey(owner.address);
-  const recipientKeyOnChain = await registrar.getUserPublicKey(recipientSigner.address);
 
   if (BigInt(senderKeyOnChain[0].toString()) !== sender.publicKey[0] || BigInt(senderKeyOnChain[1].toString()) !== sender.publicKey[1]) {
     throw new Error("Sender on-chain public key does not match key derived from AVA_PK. Run reregister-known-users first.");
-  }
-
-  if (BigInt(recipientKeyOnChain[0].toString()) !== recipient.publicKey[0] || BigInt(recipientKeyOnChain[1].toString()) !== recipient.publicKey[1]) {
-    throw new Error("Recipient on-chain public key does not match key derived from AVA_PK2. Run reregister-known-users first.");
   }
 
   const auditor = await encryptedERC.auditor();
@@ -292,7 +303,7 @@ async function main() {
   const privateTransferTx = await encryptedERC
     .connect(owner)
     ["transfer(address,uint256,((uint256[2],uint256[2][2],uint256[2]),uint256[32]),uint256[7])"](
-      recipientSigner.address,
+      recipient.evmAddress,
       TOKEN_ID,
       proof as TransferProofStruct,
       senderBalancePCT as [bigint, bigint, bigint, bigint, bigint, bigint, bigint],
@@ -300,16 +311,14 @@ async function main() {
   await privateTransferTx.wait();
 
   const senderBalanceAfterRaw = (await encryptedERC.balanceOfStandalone(owner.address)) as unknown as StandaloneBalance;
-  const recipientBalanceAfterRaw = (await encryptedERC.balanceOfStandalone(recipientSigner.address)) as unknown as StandaloneBalance;
 
   const senderAfter = getDecryptedBalanceFromPCT(sender.rawPrivateKey, senderBalanceAfterRaw);
-  const recipientAfter = getDecryptedBalanceFromPCT(recipient.rawPrivateKey, recipientBalanceAfterRaw);
 
   console.table({
     privateTransferTx: privateTransferTx.hash,
     senderBefore: senderBalanceBefore.toString(),
     senderAfter: senderAfter.toString(),
-    recipientAfter: recipientAfter.toString(),
+    recipient: recipient.evmAddress,
     expectedSenderAfter: (senderBalanceBefore - transferAmount).toString(),
     expectedRecipientIncrease: transferAmount.toString(),
     snowtraceTx: `https://testnet.snowtrace.io/tx/${privateTransferTx.hash}`,
