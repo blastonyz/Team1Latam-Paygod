@@ -208,7 +208,7 @@ export default function SettingsPage() {
                 {result.decrypted && (
                   <div style={{ color: '#B9B9B9' }}>
                     <span style={{ color: '#888' }}>Amount: </span>
-                    <span style={{ color: '#FFF' }}>{BigInt(result.decrypted.amountBaseUnits || 0) / 100n} AVAX</span>
+                    <span style={{ color: '#FFF' }}>{BigInt(result.decrypted.amountBaseUnits || 0) / 100n} eERC20</span>
                   </div>
                 )}
               </div>

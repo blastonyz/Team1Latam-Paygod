@@ -182,7 +182,7 @@ const StepAmount: React.FC<{
         className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
         style={{ color: "var(--text-secondary)", fontSize: 13, fontWeight: 500 }}
       >
-        AVAX
+        eERC20
       </span>
     </div>
     <div
@@ -540,7 +540,7 @@ const StepConfirm: React.FC<{
           </span>
         </SummaryRow>
         <SummaryRow label="Amount">
-          <span className="text-white" style={{ fontWeight: 500 }}>{amount || "0"} AVAX</span>
+          <span className="text-white" style={{ fontWeight: 500 }}>{amount || "0"} eERC20</span>
         </SummaryRow>
         <SummaryRow label="Network">
           <span

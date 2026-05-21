@@ -19,6 +19,14 @@ function toBaseUnits(amount) {
   return `${BigInt(intPart) * 100n + BigInt(padded)}`;
 }
 
+function getMintAmountBaseUnits() {
+  const raw = String(process.env.MINT_AMOUNT_BASE_UNITS || "10000").trim();
+  if (!/^\d+$/.test(raw)) {
+    throw new Error("MINT_AMOUNT_BASE_UNITS must be an integer in base units");
+  }
+  return BigInt(raw);
+}
+
 export async function buildPrivateTransfer(body, context = {}) {
   const requestId = String(context.requestId || "unknown");
   const recipient = String(body?.recipient || "").trim();
@@ -38,6 +46,32 @@ export async function buildPrivateTransfer(body, context = {}) {
     const message = error instanceof Error ? error.message : "invalid amount";
     console.error("[zk-transfer] invalid-amount", { requestId, amount, message });
     return { status: 400, payload: { ok: false, error: message } };
+  }
+
+  let mintAmountBaseUnits;
+  try {
+    mintAmountBaseUnits = getMintAmountBaseUnits();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "invalid mint amount";
+    console.error("[zk-transfer] invalid-mint-amount-config", { requestId, message });
+    return { status: 500, payload: { ok: false, error: message } };
+  }
+
+  if (transferAmountBaseUnits > mintAmountBaseUnits) {
+    const maxTokens = Number(mintAmountBaseUnits) / 100;
+    console.error("[zk-transfer] amount-exceeds-demo-mint", {
+      requestId,
+      transferAmountBaseUnits: transferAmountBaseUnits.toString(),
+      mintAmountBaseUnits: mintAmountBaseUnits.toString(),
+    });
+    return {
+      status: 400,
+      payload: {
+        ok: false,
+        error: "amount exceeds current demo balance",
+        details: `Requested ${transferAmountBaseUnits.toString()} base units, but demo mint is ${mintAmountBaseUnits.toString()} base units (max ${maxTokens.toFixed(2)} eERC20). If you previously sent base units directly, convert to token amount with 2 decimals (example: use 100.00 instead of 10000).`,
+      },
+    };
   }
 
   const encryptedErcRoot = getEncryptedErcRoot();
