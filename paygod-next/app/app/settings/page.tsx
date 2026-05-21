@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Copy, CheckCircle, XCircle, ExternalLink } from "lucide-react";
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { formatPrivKeyForBabyJub, poseidonDecrypt } from "maci-crypto";
+import { mulPointEscalar } from "@zk-kit/baby-jubjub";
+import { decodeEventLog, isAddress, parseAbi } from "viem";
+import { useAccount, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -16,6 +19,10 @@ interface OpResult {
   ok?: boolean;
   error?: string;
   txHash?: string | null;
+  event?: "PrivateBurn" | "PrivateMint" | "PrivateTransfer";
+  from?: `0x${string}`;
+  to?: `0x${string}`;
+  user?: `0x${string}`;
   alreadyRegistered?: boolean;
   registeredAddress?: string;
   auditorAddress?: string;
@@ -32,6 +39,34 @@ interface OpResult {
     publicSignals: [string, string, string, string, string];
   } | null;
   registerMode?: string;
+}
+
+const privateEventsAbi = parseAbi([
+  "event PrivateTransfer(address indexed from, address indexed to, uint256[7] auditorPCT, address indexed auditorAddress)",
+  "event PrivateMint(address indexed user, uint256[7] auditorPCT, address indexed auditorAddress)",
+  "event PrivateBurn(address indexed user, uint256[7] auditorPCT, address indexed auditorAddress)",
+]);
+
+const hexRegex = /^0x[0-9a-fA-F]+$/;
+const viewKeyStoragePrefix = "paygod.viewkey";
+
+function normalizeHex(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("0x") ? trimmed : `0x${trimmed}`;
+}
+
+function decryptPct(pct: bigint[], privateKey: bigint) {
+  const ciphertext = pct.slice(0, 4);
+  const authKey = pct.slice(4, 6) as [bigint, bigint];
+  const nonce = pct[6];
+  const sharedKey = mulPointEscalar(authKey, formatPrivKeyForBabyJub(privateKey));
+  const dec = poseidonDecrypt(ciphertext, sharedKey, nonce, 1);
+  return { amountBaseUnits: dec[0].toString(), nonce: nonce.toString() };
+}
+
+function getViewKeyStorageKey(walletAddress: string) {
+  return `${viewKeyStoragePrefix}.${walletAddress.toLowerCase()}`;
 }
 
 const Label = ({ children }: { children: React.ReactNode }) => (
@@ -68,12 +103,15 @@ const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 
 export default function SettingsPage() {
   const { address, isConnected } = useAccount();
-  const { encryptedErcAddress } = useWeb3App();
+  const { encryptedErcAddress, rpcUrl } = useWeb3App();
+  const publicClient = usePublicClient();
   const [agent, setAgent] = useState(true);
   const [autoBlock, setAutoBlock] = useState(true);
   const [registerAddress, setRegisterAddress] = useState("");
   const [auditorAddress, setAuditorAddress] = useState("0x90813c2C61EE01857c2fDfD003f5272b540a7AA7");
   const [decryptTxHash, setDecryptTxHash] = useState("0xa15ebfdd2e2e917b2ca51fcf3a1a35536da97e5e3a5707d8aa904ff38cfe52bb");
+  const [decryptPrivateKey, setDecryptPrivateKey] = useState("");
+  const [hasStoredViewKey, setHasStoredViewKey] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [auditorLoading, setAuditorLoading] = useState(false);
   const [decryptLoading, setDecryptLoading] = useState(false);
@@ -98,6 +136,15 @@ export default function SettingsPage() {
     if (address) {
       setRegisterAddress(address);
     }
+  }, [address]);
+
+  useEffect(() => {
+    if (!address || typeof window === "undefined") {
+      setHasStoredViewKey(false);
+      return;
+    }
+    const stored = window.localStorage.getItem(getViewKeyStorageKey(address));
+    setHasStoredViewKey(Boolean(stored));
   }, [address]);
 
   const copy = () => {
@@ -271,19 +318,130 @@ export default function SettingsPage() {
     try {
       setDecryptLoading(true);
       setDecryptResult(null);
-      const response = await fetch("/api/audit/decrypt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txHash: decryptTxHash.trim() }),
-      });
-      const payload = await response.json();
-      setDecryptResult(payload);
+
+      const txHash = decryptTxHash.trim();
+      if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+        setDecryptResult({ ok: false, error: "Invalid tx hash." });
+        return;
+      }
+
+      if (rpcUrl.includes("YOUR_ALCHEMY_KEY")) {
+        setDecryptResult({
+          ok: false,
+          error: "Invalid RPC URL: NEXT_PUBLIC_AVA_RPC_URL still has YOUR_ALCHEMY_KEY.",
+        });
+        return;
+      }
+
+      if (!publicClient) {
+        setDecryptResult({ ok: false, error: "RPC client is not available yet." });
+        return;
+      }
+
+      if (!isAddress(encryptedErcAddress || "")) {
+        setDecryptResult({ ok: false, error: "EncryptedERC address is not configured." });
+        return;
+      }
+
+      const walletStoredKey =
+        address && typeof window !== "undefined"
+          ? window.localStorage.getItem(getViewKeyStorageKey(address)) || ""
+          : "";
+
+      const normalizedPrivateKey = normalizeHex(decryptPrivateKey || walletStoredKey);
+
+      if (!normalizedPrivateKey) {
+        setDecryptResult({
+          ok: false,
+          error: "No local view key for this wallet. Save it once and decrypt will run client-side.",
+        });
+        return;
+      }
+
+      if (!hexRegex.test(normalizedPrivateKey)) {
+        setDecryptResult({ ok: false, error: "Private key must be valid hex." });
+        return;
+      }
+
+      const receipt = await publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
+
+      for (const log of receipt.logs) {
+        if (log.address.toLowerCase() !== String(encryptedErcAddress).toLowerCase()) {
+          continue;
+        }
+
+        try {
+          const parsed = decodeEventLog({
+            abi: privateEventsAbi,
+            data: log.data,
+            topics: log.topics,
+            strict: false,
+          });
+
+          const args = parsed.args as {
+            from?: `0x${string}`;
+            to?: `0x${string}`;
+            user?: `0x${string}`;
+            auditorAddress?: `0x${string}`;
+            auditorPCT?: readonly bigint[];
+          };
+
+          if (!args.auditorPCT || args.auditorPCT.length !== 7) {
+            continue;
+          }
+
+          const decrypted = decryptPct([...args.auditorPCT], BigInt(normalizedPrivateKey));
+
+          setDecryptResult({
+            ok: true,
+            txHash,
+            event: parsed.eventName,
+            auditorAddress: args.auditorAddress,
+            decrypted,
+            from: args.from,
+            to: args.to,
+            user: args.user,
+            output: "Decrypted in browser using wallet-scoped local key. No backend call.",
+            snowtraceUrl: `https://testnet.snowtrace.io/tx/${txHash}`,
+          });
+          return;
+        } catch {
+          // Ignore non-private logs and keep scanning.
+        }
+      }
+
+      setDecryptResult({ ok: false, error: "No private event found in this tx." });
     } catch (error) {
       const message = error instanceof Error ? error.message : "unexpected error";
       setDecryptResult({ ok: false, error: message });
     } finally {
       setDecryptLoading(false);
     }
+  };
+
+  const saveViewKeyForWallet = () => {
+    if (!address) {
+      setDecryptResult({ ok: false, error: "Connect wallet first to bind a local view key." });
+      return;
+    }
+
+    const normalizedPrivateKey = normalizeHex(decryptPrivateKey);
+    if (!normalizedPrivateKey || !hexRegex.test(normalizedPrivateKey)) {
+      setDecryptResult({ ok: false, error: "Enter a valid private key before saving." });
+      return;
+    }
+
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(getViewKeyStorageKey(address), normalizedPrivateKey);
+    setHasStoredViewKey(true);
+    setDecryptResult({ ok: true, output: "View key saved locally for connected wallet." });
+  };
+
+  const clearViewKeyForWallet = () => {
+    if (!address || typeof window === "undefined") return;
+    window.localStorage.removeItem(getViewKeyStorageKey(address));
+    setHasStoredViewKey(false);
+    setDecryptResult({ ok: true, output: "Local view key cleared for connected wallet." });
   };
 
   return (
@@ -383,6 +541,26 @@ export default function SettingsPage() {
               onChange={(e) => setDecryptTxHash(e.target.value)}
               placeholder="Private transfer tx hash"
             />
+            <Input
+              type="password"
+              value={decryptPrivateKey}
+              onChange={(e) => setDecryptPrivateKey(e.target.value)}
+              placeholder="View key (one-time bind to connected wallet)"
+            />
+            <div className="text-[11px] text-[#888]">
+              Decrypt is browser-only. Save the key once for this wallet, then you can decrypt without pasting again.
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={saveViewKeyForWallet}>
+                Save View Key for Wallet
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearViewKeyForWallet}>
+                Clear Saved Key
+              </Button>
+            </div>
+            <div className="text-[11px] text-[#888]">
+              Saved key status: {hasStoredViewKey ? "available for connected wallet" : "not saved"}
+            </div>
             <Button variant="primary" size="sm" onClick={runDecrypt} loading={decryptLoading}>
               Decrypt Transaction
             </Button>
