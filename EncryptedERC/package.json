@@ -40,7 +40,10 @@
 		"decrypt:private:tx:fuji": "npx hardhat run scripts/decrypt-private-tx.ts --network fuji",
 		"index:balances:fuji": "npx hardhat run scripts/index-encrypted-balances.ts --network fuji",
 		"smoke:generic": "npx hardhat run scripts/smoke-generic-transfer-burn.ts",
-		"postinstall": "patch-package && npx hardhat compile & npx hardhat zkit make --force && npx hardhat zkit verifiers",
+		"zkit:make": "hardhat zkit make --force && node scripts/fix-zkit-imports.cjs",
+		"zkit:fix-imports": "node scripts/fix-zkit-imports.cjs",
+		"zkit:verifiers": "node scripts/run-zkit-verifiers.cjs",
+		"postinstall": "patch-package && npx hardhat compile & npm run zkit:make && npm run zkit:verifiers",
 		"lint:sol": "solhint '**/*.sol' --config ./.solhint.json --ignore-path ./.solhintignore --max-warnings 0 && npx prettier --check '**/*.sol' --config ./.prettierrc",
 		"lint:ts": "npx biome lint .",
 		"lint": "npm run lint:sol && npm run lint:ts"
